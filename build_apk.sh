@@ -43,32 +43,32 @@ $AAPT package -f \
     -F $OUT/app-unsigned.apk \
     $OUT/dex
 
-echo "=== مرحله ۵: تولید کلید امضا ==="
-KEYSTORE=$OUT/debug.keystore
-if [ ! -f $KEYSTORE ]; then
-    keytool -genkey -v \
-        -keystore $KEYSTORE \
-        -alias smsbot \
-        -keyalg RSA \
-        -keysize 2048 \
-        -validity 10000 \
-        -storepass android \
-        -keypass android \
-        -dname "CN=SmsBat, OU=Dev, O=jdjv, L=Tehran, S=Tehran, C=IR" \
-        2>/dev/null
-fi
+echo "=== مرحله ۵: تراز کردن APK (قبل از امضا) ==="
+$ZIPALIGN -f 4 $OUT/app-unsigned.apk $OUT/app-aligned.apk
 
-echo "=== مرحله ۶: امضای APK ==="
+echo "=== مرحله ۶: تولید کلید امضا ==="
+KEYSTORE=$OUT/debug.keystore
+keytool -genkey -v \
+    -keystore $KEYSTORE \
+    -alias smsbot \
+    -keyalg RSA \
+    -keysize 2048 \
+    -validity 10000 \
+    -storepass android \
+    -keypass android \
+    -dname "CN=SmsBat, OU=Dev, O=jdjv, L=Tehran, S=Tehran, C=IR" \
+    2>/dev/null
+
+echo "=== مرحله ۷: امضای APK (آخرین مرحله) ==="
 $APKSIGNER sign \
     --ks $KEYSTORE \
     --ks-key-alias smsbot \
     --ks-pass pass:android \
     --key-pass pass:android \
-    --out $OUT/app-signed.apk \
-    $OUT/app-unsigned.apk
-
-echo "=== مرحله ۷: تراز کردن APK ==="
-$ZIPALIGN -v 4 $OUT/app-signed.apk /home/user/jdjv/SmsBat.apk
+    --v1-signing-enabled true \
+    --v2-signing-enabled true \
+    --out /home/user/jdjv/SmsBat.apk \
+    $OUT/app-aligned.apk
 
 echo ""
 echo "✅ APK آماده است: /home/user/jdjv/SmsBat.apk"
