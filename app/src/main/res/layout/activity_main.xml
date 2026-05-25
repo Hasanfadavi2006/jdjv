@@ -3,51 +3,5 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
     android:background="#121212">
-
-    <TextView
-        android:text="SmsBat 🤖"
-        android:textSize="24sp"
-        android:textColor="#FFFFFF"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingBottom="8dp"/>
-
-    <TextView
-        android:id="@+id/statusTv"
-        android:text="بات: فعال ✅"
-        android:textSize="16sp"
-        android:textColor="#4CAF50"
-        android:gravity="center"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingBottom="12dp"/>
-
-    <Button
-        android:id="@+id/toggleBtn"
-        android:text="غیرفعال کردن بات"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:backgroundTint="#1976D2"
-        android:layout_marginBottom="12dp"/>
-
-    <TextView
-        android:text="لاگ پیام‌ها:"
-        android:textColor="#AAAAAA"
-        android:textSize="13sp"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingBottom="4dp"/>
-
-    <ListView
-        android:id="@+id/listView"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:divider="#333333"
-        android:dividerHeight="1dp"/>
-
 </LinearLayout>

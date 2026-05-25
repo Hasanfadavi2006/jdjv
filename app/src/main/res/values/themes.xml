@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.SmsBat" parent="Theme.AppCompat.DayNight.DarkActionBar">
-        <item name="colorPrimary">#1976D2</item>
-        <item name="colorPrimaryDark">#0D47A1</item>
-        <item name="colorAccent">#4CAF50</item>
+    <style name="Theme.SmsBat" parent="android:Theme.Material.NoActionBar">
     </style>
 </resources>
