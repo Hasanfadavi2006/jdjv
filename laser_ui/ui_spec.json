@@ -1,0 +1,997 @@
+{
+  "$schema": "laser_ui_v1",
+  "meta": {
+    "project":      "LaserMed Pro X7 - Embedded Touchscreen UI",
+    "version":      "1.0.0",
+    "target_mcu":   "LPC1788",
+    "display_w":    800,
+    "display_h":    480,
+    "color_depth":  "RGB565",
+    "orientation":  "LANDSCAPE",
+    "storage":      "SD_CARD",
+    "image_format": "BMP_16BIT_RGB565",
+    "touch_type":   "RESISTIVE_4WIRE",
+    "min_touch_w":  44,
+    "min_touch_h":  44
+  },
+
+  "layout_zones": {
+    "header":     { "x": 0,   "y": 0,   "w": 800, "h": 48  },
+    "nav":        { "x": 0,   "y": 48,  "w": 128, "h": 384 },
+    "content":    { "x": 136, "y": 48,  "w": 664, "h": 384 },
+    "status_bar": { "x": 0,   "y": 432, "w": 800, "h": 48  }
+  },
+
+  "colors": {
+    "BG":          "0x0884",
+    "CARD_BG":     "0x10E6",
+    "CARD_BORDER": "0x1965",
+    "ACCENT":      "0x05DF",
+    "RED":         "0xF9C7",
+    "GREEN":       "0x2730",
+    "ORANGE":      "0xFCC3",
+    "PURPLE":      "0x9A5F",
+    "WHITE":       "0xFFFF",
+    "GRAY":        "0x84B6",
+    "WARN_BG":     "0x8200",
+    "RED_DIM":     "0x2000",
+    "GREEN_DIM":   "0x0480"
+  },
+
+  "fonts": [
+    { "id": 0, "name": "Inter_12",  "size_px": 12 },
+    { "id": 1, "name": "Inter_16",  "size_px": 16 },
+    { "id": 2, "name": "Inter_24",  "size_px": 24 },
+    { "id": 3, "name": "Inter_40",  "size_px": 40 }
+  ],
+
+  "images": [
+    { "idx": 0,  "file": "LOGO.BMP",    "w": 34, "h": 34, "desc": "App logo icon" },
+    { "idx": 1,  "file": "DOT_G.BMP",   "w": 14, "h": 14, "desc": "Green status dot" },
+    { "idx": 2,  "file": "DOT_R.BMP",   "w": 14, "h": 14, "desc": "Red status dot" },
+    { "idx": 3,  "file": "DOT_O.BMP",   "w": 14, "h": 14, "desc": "Orange status dot" },
+    { "idx": 4,  "file": "PWR_ON.BMP",  "w": 72, "h": 72, "desc": "Power button ON state (green glow ring)" },
+    { "idx": 5,  "file": "PWR_OFF.BMP", "w": 72, "h": 72, "desc": "Power button OFF state (dim ring)" },
+    { "idx": 6,  "file": "BTN_M.BMP",   "w": 44, "h": 44, "desc": "Minus/decrement button" },
+    { "idx": 7,  "file": "BTN_P.BMP",   "w": 44, "h": 44, "desc": "Plus/increment button" },
+    { "idx": 8,  "file": "BTN_PS.BMP",  "w": 144,"h": 46, "desc": "Pause button background" },
+    { "idx": 9,  "file": "BTN_ST.BMP",  "w": 144,"h": 46, "desc": "Stop button background" },
+    { "idx": 10, "file": "BTN_SR.BMP",  "w": 296,"h": 66, "desc": "Start Treatment button background" },
+    { "idx": 11, "file": "BTN_ES.BMP",  "w": 136,"h": 136,"desc": "Emergency STOP button (large red)" },
+    { "idx": 12, "file": "MD_CW.BMP",   "w": 80, "h": 146,"desc": "Mode button: Continuous Wave (inactive)" },
+    { "idx": 13, "file": "MD_CWA.BMP",  "w": 80, "h": 146,"desc": "Mode button: Continuous Wave (active)" },
+    { "idx": 14, "file": "MD_PW.BMP",   "w": 80, "h": 146,"desc": "Mode button: Pulsed Wave (inactive)" },
+    { "idx": 15, "file": "MD_PWA.BMP",  "w": 80, "h": 146,"desc": "Mode button: Pulsed Wave (active)" },
+    { "idx": 16, "file": "MD_SP.BMP",   "w": 80, "h": 146,"desc": "Mode button: Super Pulse (inactive)" },
+    { "idx": 17, "file": "MD_SPA.BMP",  "w": 80, "h": 146,"desc": "Mode button: Super Pulse (active)" },
+    { "idx": 18, "file": "MD_FR.BMP",   "w": 80, "h": 146,"desc": "Mode button: Fractional (inactive)" },
+    { "idx": 19, "file": "MD_FRA.BMP",  "w": 80, "h": 146,"desc": "Mode button: Fractional (active)" },
+    { "idx": 20, "file": "NAV_D.BMP",   "w": 128,"h": 72, "desc": "Nav: Dashboard (inactive)" },
+    { "idx": 21, "file": "NAV_DA.BMP",  "w": 128,"h": 72, "desc": "Nav: Dashboard (active)" },
+    { "idx": 22, "file": "NAV_T.BMP",   "w": 128,"h": 72, "desc": "Nav: Treatment (inactive)" },
+    { "idx": 23, "file": "NAV_TA.BMP",  "w": 128,"h": 72, "desc": "Nav: Treatment (active)" },
+    { "idx": 24, "file": "NAV_S.BMP",   "w": 128,"h": 72, "desc": "Nav: Safety (inactive)" },
+    { "idx": 25, "file": "NAV_SA.BMP",  "w": 128,"h": 72, "desc": "Nav: Safety (active)" },
+    { "idx": 26, "file": "NAV_G.BMP",   "w": 128,"h": 72, "desc": "Nav: Settings (inactive)" },
+    { "idx": 27, "file": "NAV_GA.BMP",  "w": 128,"h": 72, "desc": "Nav: Settings (active)" },
+    { "idx": 28, "file": "SAFE_OK.BMP", "w": 222,"h": 120,"desc": "Safety status box: OK state" },
+    { "idx": 29, "file": "SAFE_ER.BMP", "w": 222,"h": 120,"desc": "Safety status box: ERROR state" },
+    { "idx": 30, "file": "SAFE_WN.BMP", "w": 222,"h": 120,"desc": "Safety status box: WARN state" }
+  ],
+
+  "pages": [
+
+    {
+      "page_id": 0,
+      "name": "DASHBOARD",
+      "bg_color": "0x0884",
+      "elements": [
+
+        { "id": "hdr_bg",          "type": "RECT",      "x": 0,   "y": 0,   "w": 800, "h": 48,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "img_logo",        "type": "IMAGE",     "x": 8,   "y": 7,   "w": 34,  "h": 34,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "LOGO.BMP",
+          "label": "", "fg": "0xFFFF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_title",       "type": "TEXT",      "x": 50,  "y": 6,   "w": 220, "h": 20,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "LaserMed Pro X7", "fg": "0xFFFF", "bg": "0x0000", "font": 1,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_subtitle",    "type": "TEXT",      "x": 50,  "y": 28,  "w": 260, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Medical Laser Control System  v3.2.1", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "ind_status_dot",  "type": "IMAGE",     "x": 688, "y": 17,  "w": 14,  "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "DOT_G.BMP",
+          "label": "", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_sys_status",  "type": "TEXT",      "x": 708, "y": 15,  "w": 56,  "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "READY", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_time",        "type": "TEXT",      "x": 758, "y": 15,  "w": 42,  "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "14:32", "fg": "0x05DF", "bg": "0x0000", "font": 1,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "nav_bg",          "type": "RECT",      "x": 0,   "y": 48,  "w": 128, "h": 384,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_nav_dash",    "type": "BUTTON",    "x": 0,   "y": 48,  "w": 128, "h": 72,
+          "touch": {"x":0,"y":48,"w":128,"h":72}, "img": "NAV_DA.BMP",
+          "label": "Dashboard", "fg": "0x05DF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "btn_nav_treat",   "type": "BUTTON",    "x": 0,   "y": 120, "w": 128, "h": 72,
+          "touch": {"x":0,"y":120,"w":128,"h":72}, "img": "NAV_T.BMP",
+          "label": "Treatment", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 1, "param": 0, "enabled": true },
+
+        { "id": "btn_nav_safety",  "type": "BUTTON",    "x": 0,   "y": 192, "w": 128, "h": 72,
+          "touch": {"x":0,"y":192,"w":128,"h":72}, "img": "NAV_S.BMP",
+          "label": "Safety", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 2, "param": 0, "enabled": true },
+
+        { "id": "btn_nav_settings","type": "BUTTON",    "x": 0,   "y": 264, "w": 128, "h": 72,
+          "touch": {"x":0,"y":264,"w":128,"h":72}, "img": "NAV_G.BMP",
+          "label": "Settings", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 3, "param": 0, "enabled": true },
+
+        { "id": "power_card_bg",   "type": "RECT",      "x": 136, "y": 56,  "w": 176, "h": 176,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_power_title", "type": "TEXT",      "x": 146, "y": 66,  "w": 156, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "POWER CONTROL", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_power_toggle","type": "BUTTON",    "x": 188, "y": 84,  "w": 72,  "h": 72,
+          "touch": {"x":180,"y":76,"w":88,"h":88}, "img": "PWR_ON.BMP",
+          "label": "ON", "fg": "0x2730", "bg": "0x0480", "font": 1,
+          "action": "ACTION_POWER_TOGGLE", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "lbl_sys_active",  "type": "TEXT",      "x": 152, "y": 164, "w": 140, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "System Active", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_uptime",      "type": "TEXT",      "x": 160, "y": 182, "w": 120, "h": 12,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "02:14:33", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "int_card_bg",     "type": "RECT",      "x": 320, "y": 56,  "w": 240, "h": 176,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_int_title",   "type": "TEXT",      "x": 330, "y": 66,  "w": 220, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "LASER INTENSITY", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_int_value",   "type": "TEXT",      "x": 388, "y": 82,  "w": 84,  "h": 52,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "75%", "fg": "0x05DF", "bg": "0x0000", "font": 3,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_int_down",    "type": "BUTTON",    "x": 330, "y": 90,  "w": 44,  "h": 44,
+          "touch": {"x":326,"y":86,"w":52,"h":52}, "img": "BTN_M.BMP",
+          "label": "-", "fg": "0x05DF", "bg": "0x10E6", "font": 1,
+          "action": "ACTION_INTENSITY_DOWN_1", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "btn_int_up",      "type": "BUTTON",    "x": 506, "y": 90,  "w": 44,  "h": 44,
+          "touch": {"x":502,"y":86,"w":52,"h":52}, "img": "BTN_P.BMP",
+          "label": "+", "fg": "0x05DF", "bg": "0x10E6", "font": 1,
+          "action": "ACTION_INTENSITY_UP_1", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "int_slider_track","type": "RECT",      "x": 330, "y": 148, "w": 220, "h": 10,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x1965", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "int_slider_fill", "type": "PROGRESS_BAR","x": 330,"y": 148, "w": 165, "h": 10,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "75", "fg": "0x05DF", "bg": "0x1965", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 220, "enabled": false },
+
+        { "id": "lbl_int_min",     "type": "TEXT",      "x": 330, "y": 162, "w": 30,  "h": 12,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "0%", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_int_max",     "type": "TEXT",      "x": 516, "y": 162, "w": 34,  "h": 12,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "100%", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "int_warn_bg",     "type": "RECT",      "x": 330, "y": 180, "w": 220, "h": 26,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x8200", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_int_warn",    "type": "TEXT",      "x": 336, "y": 186, "w": 208, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "! High intensity - verify patient params", "fg": "0xFCC3", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "temp_card_bg",    "type": "RECT",      "x": 568, "y": 56,  "w": 228, "h": 176,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_temp_title",  "type": "TEXT",      "x": 578, "y": 66,  "w": 208, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "TEMPERATURE", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_temp_value",  "type": "TEXT",      "x": 598, "y": 86,  "w": 168, "h": 52,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "38.2C", "fg": "0x05DF", "bg": "0x0000", "font": 2,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_temp_status", "type": "TEXT",      "x": 596, "y": 146, "w": 160, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Normal Range", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "temp_bar_bg",     "type": "RECT",      "x": 578, "y": 166, "w": 208, "h": 10,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x1965", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "temp_bar_fill",   "type": "PROGRESS_BAR","x": 578,"y": 166, "w": 104, "h": 10,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "50", "fg": "0x2730", "bg": "0x1965", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 208, "enabled": false },
+
+        { "id": "lbl_temp_min",    "type": "TEXT",      "x": 578, "y": 180, "w": 28,  "h": 12,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "20", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_temp_max",    "type": "TEXT",      "x": 766, "y": 180, "w": 28,  "h": 12,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "60", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_temp_opt",    "type": "TEXT",      "x": 608, "y": 196, "w": 148, "h": 12,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Optimal: 35-42 C", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "mode_card_bg",    "type": "RECT",      "x": 136, "y": 240, "w": 352, "h": 184,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_mode_title",  "type": "TEXT",      "x": 146, "y": 250, "w": 332, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "TREATMENT MODE", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_mode_cw",     "type": "BUTTON",    "x": 144, "y": 270, "w": 80,  "h": 146,
+          "touch": {"x":140,"y":266,"w":88,"h":154}, "img": "MD_CWA.BMP",
+          "label": "CW\nContinuous", "fg": "0x05DF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_MODE_SELECT", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "btn_mode_pw",     "type": "BUTTON",    "x": 228, "y": 270, "w": 80,  "h": 146,
+          "touch": {"x":224,"y":266,"w":88,"h":154}, "img": "MD_PW.BMP",
+          "label": "PW\nPulse", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_MODE_SELECT", "next_page": 0, "param": 1, "enabled": true },
+
+        { "id": "btn_mode_sp",     "type": "BUTTON",    "x": 312, "y": 270, "w": 80,  "h": 146,
+          "touch": {"x":308,"y":266,"w":88,"h":154}, "img": "MD_SP.BMP",
+          "label": "SP\nSuper Pulse", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_MODE_SELECT", "next_page": 0, "param": 2, "enabled": true },
+
+        { "id": "btn_mode_fr",     "type": "BUTTON",    "x": 396, "y": 270, "w": 80,  "h": 146,
+          "touch": {"x":392,"y":266,"w":88,"h":154}, "img": "MD_FR.BMP",
+          "label": "FR\nFractional", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_MODE_SELECT", "next_page": 0, "param": 3, "enabled": true },
+
+        { "id": "timer_card_bg",   "type": "RECT",      "x": 496, "y": 240, "w": 300, "h": 184,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_timer_title", "type": "TEXT",      "x": 506, "y": 250, "w": 280, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "TREATMENT TIMER", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_timer_value", "type": "TEXT",      "x": 556, "y": 268, "w": 130, "h": 52,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "05:30", "fg": "0xFFFF", "bg": "0x0000", "font": 3,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_timer_sub",   "type": "TEXT",      "x": 561, "y": 322, "w": 120, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Remaining", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "timer_bar_bg",    "type": "RECT",      "x": 506, "y": 344, "w": 280, "h": 8,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x1965", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "timer_bar_fill",  "type": "PROGRESS_BAR","x": 506,"y": 344, "w": 168, "h": 8,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "60", "fg": "0x9A5F", "bg": "0x1965", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 280, "enabled": false },
+
+        { "id": "lbl_timer_pct",   "type": "TEXT",      "x": 551, "y": 356, "w": 140, "h": 12,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "60% complete", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_timer_pause", "type": "BUTTON",    "x": 496, "y": 374, "w": 144, "h": 46,
+          "touch": {"x":492,"y":370,"w":152,"h":54}, "img": "BTN_PS.BMP",
+          "label": "PAUSE", "fg": "0x05DF", "bg": "0x0000", "font": 1,
+          "action": "ACTION_TIMER_PAUSE", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "btn_timer_stop",  "type": "BUTTON",    "x": 648, "y": 374, "w": 144, "h": 46,
+          "touch": {"x":644,"y":370,"w":152,"h":54}, "img": "BTN_ST.BMP",
+          "label": "STOP", "fg": "0xF9C7", "bg": "0x0000", "font": 1,
+          "action": "ACTION_TIMER_STOP", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "sbar_bg",         "type": "RECT",      "x": 0,   "y": 432, "w": 800, "h": 48,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "sbar_dot",        "type": "IMAGE",     "x": 12,  "y": 450, "w": 12,  "h": 12,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "DOT_G.BMP",
+          "label": "", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "sbar_lbl_conn",   "type": "TEXT",      "x": 28,  "y": 446, "w": 88,  "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Connected", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "sbar_div1",       "type": "RECT",      "x": 128, "y": 440, "w": 1,   "h": 28,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x1965", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "sbar_lbl_pwr",    "type": "TEXT",      "x": 136, "y": 446, "w": 110, "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Power: 75W", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "sbar_div2",       "type": "RECT",      "x": 258, "y": 440, "w": 1,   "h": 28,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x1965", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "sbar_lbl_temp",   "type": "TEXT",      "x": 266, "y": 446, "w": 120, "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Temp: 38.2C", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "sbar_div3",       "type": "RECT",      "x": 398, "y": 440, "w": 1,   "h": 28,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x1965", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "sbar_lbl_sess",   "type": "TEXT",      "x": 406, "y": 446, "w": 140, "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Session: 02:14:33", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "sbar_div4",       "type": "RECT",      "x": 558, "y": 440, "w": 1,   "h": 28,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x1965", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "sbar_lbl_safe",   "type": "TEXT",      "x": 566, "y": 446, "w": 100, "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Safety: Armed", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "sbar_div5",       "type": "RECT",      "x": 678, "y": 440, "w": 1,   "h": 28,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x1965", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "sbar_lbl_net",    "type": "TEXT",      "x": 686, "y": 446, "w": 90,  "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Online", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false }
+      ]
+    },
+
+    {
+      "page_id": 1,
+      "name": "TREATMENT CONTROL",
+      "bg_color": "0x0884",
+      "elements": [
+
+        { "id": "hdr_bg",          "type": "RECT",      "x": 0,   "y": 0,   "w": 800, "h": 48,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "img_logo",        "type": "IMAGE",     "x": 8,   "y": 7,   "w": 34,  "h": 34,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "LOGO.BMP",
+          "label": "", "fg": "0xFFFF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_title",       "type": "TEXT",      "x": 50,  "y": 6,   "w": 300, "h": 20,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "LaserMed Pro X7 - Treatment Control", "fg": "0xFFFF", "bg": "0x0000", "font": 1,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "nav_bg",          "type": "RECT",      "x": 0,   "y": 48,  "w": 128, "h": 384,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_nav_dash",    "type": "BUTTON",    "x": 0,   "y": 48,  "w": 128, "h": 72,
+          "touch": {"x":0,"y":48,"w":128,"h":72}, "img": "NAV_D.BMP",
+          "label": "Dashboard", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "btn_nav_treat",   "type": "BUTTON",    "x": 0,   "y": 120, "w": 128, "h": 72,
+          "touch": {"x":0,"y":120,"w":128,"h":72}, "img": "NAV_TA.BMP",
+          "label": "Treatment", "fg": "0x05DF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 1, "param": 0, "enabled": true },
+
+        { "id": "btn_nav_safety",  "type": "BUTTON",    "x": 0,   "y": 192, "w": 128, "h": 72,
+          "touch": {"x":0,"y":192,"w":128,"h":72}, "img": "NAV_S.BMP",
+          "label": "Safety", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 2, "param": 0, "enabled": true },
+
+        { "id": "btn_nav_settings","type": "BUTTON",    "x": 0,   "y": 264, "w": 128, "h": 72,
+          "touch": {"x":0,"y":264,"w":128,"h":72}, "img": "NAV_G.BMP",
+          "label": "Settings", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 3, "param": 0, "enabled": true },
+
+        { "id": "int_panel_bg",    "type": "RECT",      "x": 136, "y": 56,  "w": 316, "h": 368,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_int_ctrl",    "type": "TEXT",      "x": 146, "y": 66,  "w": 296, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "LASER INTENSITY CONTROL", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_int_big",     "type": "TEXT",      "x": 196, "y": 98,  "w": 140, "h": 64,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "75%", "fg": "0x05DF", "bg": "0x0000", "font": 3,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_int_m10",     "type": "BUTTON",    "x": 146, "y": 106, "w": 44,  "h": 44,
+          "touch": {"x":140,"y":100,"w":56,"h":56}, "img": "BTN_M.BMP",
+          "label": "-10", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_INTENSITY_DOWN_10", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "btn_int_m1",      "type": "BUTTON",    "x": 154, "y": 164, "w": 44,  "h": 44,
+          "touch": {"x":148,"y":158,"w":56,"h":56}, "img": "BTN_M.BMP",
+          "label": "-1", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_INTENSITY_DOWN_1", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "btn_int_p1",      "type": "BUTTON",    "x": 336, "y": 164, "w": 44,  "h": 44,
+          "touch": {"x":330,"y":158,"w":56,"h":56}, "img": "BTN_P.BMP",
+          "label": "+1", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_INTENSITY_UP_1", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "btn_int_p10",     "type": "BUTTON",    "x": 344, "y": 106, "w": 44,  "h": 44,
+          "touch": {"x":338,"y":100,"w":56,"h":56}, "img": "BTN_P.BMP",
+          "label": "+10", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_INTENSITY_UP_10", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "int_bar_bg",      "type": "RECT",      "x": 146, "y": 222, "w": 296, "h": 24,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x1965", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "int_bar_fill",    "type": "PROGRESS_BAR","x": 146,"y": 222, "w": 222, "h": 24,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "75", "fg": "0x05DF", "bg": "0x1965", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 296, "enabled": false },
+
+        { "id": "lbl_mode_curr",   "type": "TEXT",      "x": 166, "y": 260, "w": 256, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Mode: Continuous Wave (CW)", "fg": "0x05DF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_start_treat", "type": "BUTTON",    "x": 146, "y": 358, "w": 296, "h": 66,
+          "touch": {"x":140,"y":352,"w":308,"h":78}, "img": "BTN_SR.BMP",
+          "label": "START TREATMENT", "fg": "0x0884", "bg": "0x2730", "font": 2,
+          "action": "ACTION_TIMER_START", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "pulse_panel_bg",  "type": "RECT",      "x": 460, "y": 56,  "w": 336, "h": 368,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_pulse_title", "type": "TEXT",      "x": 470, "y": 66,  "w": 316, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "PULSE PARAMETERS", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "freq_box_bg",     "type": "RECT",      "x": 468, "y": 88,  "w": 156, "h": 152,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x0884", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_freq",        "type": "TEXT",      "x": 478, "y": 98,  "w": 136, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "FREQUENCY", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_freq_val",    "type": "TEXT",      "x": 490, "y": 122, "w": 80,  "h": 40,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "10", "fg": "0x05DF", "bg": "0x0000", "font": 2,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_freq_unit",   "type": "TEXT",      "x": 540, "y": 138, "w": 36,  "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Hz", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_freq_down",   "type": "BUTTON",    "x": 468, "y": 180, "w": 44,  "h": 44,
+          "touch": {"x":464,"y":176,"w":52,"h":52}, "img": "BTN_M.BMP",
+          "label": "-", "fg": "0xFFFF", "bg": "0x10E6", "font": 1,
+          "action": "ACTION_FREQ_DOWN", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "btn_freq_up",     "type": "BUTTON",    "x": 576, "y": 180, "w": 44,  "h": 44,
+          "touch": {"x":572,"y":176,"w":52,"h":52}, "img": "BTN_P.BMP",
+          "label": "+", "fg": "0xFFFF", "bg": "0x10E6", "font": 1,
+          "action": "ACTION_FREQ_UP", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "pw_box_bg",       "type": "RECT",      "x": 632, "y": 88,  "w": 156, "h": 152,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x0884", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_pw",          "type": "TEXT",      "x": 642, "y": 98,  "w": 136, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "PULSE WIDTH", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_pw_val",      "type": "TEXT",      "x": 650, "y": 122, "w": 80,  "h": 40,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "100", "fg": "0x05DF", "bg": "0x0000", "font": 2,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_pw_unit",     "type": "TEXT",      "x": 716, "y": 138, "w": 36,  "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "us", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_pw_down",     "type": "BUTTON",    "x": 632, "y": 180, "w": 44,  "h": 44,
+          "touch": {"x":628,"y":176,"w":52,"h":52}, "img": "BTN_M.BMP",
+          "label": "-", "fg": "0xFFFF", "bg": "0x10E6", "font": 1,
+          "action": "ACTION_PULSEWIDTH_DOWN", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "btn_pw_up",       "type": "BUTTON",    "x": 740, "y": 180, "w": 44,  "h": 44,
+          "touch": {"x":736,"y":176,"w":52,"h":52}, "img": "BTN_P.BMP",
+          "label": "+", "fg": "0xFFFF", "bg": "0x10E6", "font": 1,
+          "action": "ACTION_PULSEWIDTH_UP", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "dc_box_bg",       "type": "RECT",      "x": 468, "y": 252, "w": 156, "h": 152,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x0884", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_dc",          "type": "TEXT",      "x": 478, "y": 262, "w": 136, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "DUTY CYCLE", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_dc_val",      "type": "TEXT",      "x": 490, "y": 286, "w": 80,  "h": 40,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "10", "fg": "0x05DF", "bg": "0x0000", "font": 2,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_dc_unit",     "type": "TEXT",      "x": 540, "y": 302, "w": 20,  "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "%", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_dc_down",     "type": "BUTTON",    "x": 468, "y": 344, "w": 44,  "h": 44,
+          "touch": {"x":464,"y":340,"w":52,"h":52}, "img": "BTN_M.BMP",
+          "label": "-", "fg": "0xFFFF", "bg": "0x10E6", "font": 1,
+          "action": "ACTION_DUTYCYCLE_DOWN", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "btn_dc_up",       "type": "BUTTON",    "x": 576, "y": 344, "w": 44,  "h": 44,
+          "touch": {"x":572,"y":340,"w":52,"h":52}, "img": "BTN_P.BMP",
+          "label": "+", "fg": "0xFFFF", "bg": "0x10E6", "font": 1,
+          "action": "ACTION_DUTYCYCLE_UP", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "pp_box_bg",       "type": "RECT",      "x": 632, "y": 252, "w": 156, "h": 152,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x0884", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_pp",          "type": "TEXT",      "x": 642, "y": 262, "w": 136, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "PEAK POWER", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_pp_val",      "type": "TEXT",      "x": 650, "y": 286, "w": 80,  "h": 40,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "50", "fg": "0x05DF", "bg": "0x0000", "font": 2,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_pp_unit",     "type": "TEXT",      "x": 710, "y": 302, "w": 24,  "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "W", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_pp_down",     "type": "BUTTON",    "x": 632, "y": 344, "w": 44,  "h": 44,
+          "touch": {"x":628,"y":340,"w":52,"h":52}, "img": "BTN_M.BMP",
+          "label": "-", "fg": "0xFFFF", "bg": "0x10E6", "font": 1,
+          "action": "ACTION_PEAKPOWER_DOWN", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "btn_pp_up",       "type": "BUTTON",    "x": 740, "y": 344, "w": 44,  "h": 44,
+          "touch": {"x":736,"y":340,"w":52,"h":52}, "img": "BTN_P.BMP",
+          "label": "+", "fg": "0xFFFF", "bg": "0x10E6", "font": 1,
+          "action": "ACTION_PEAKPOWER_UP", "next_page": 0, "param": 0, "enabled": true }
+      ]
+    },
+
+    {
+      "page_id": 2,
+      "name": "SAFETY MONITOR",
+      "bg_color": "0x0884",
+      "elements": [
+
+        { "id": "hdr_bg",          "type": "RECT",      "x": 0,   "y": 0,   "w": 800, "h": 48,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "img_logo",        "type": "IMAGE",     "x": 8,   "y": 7,   "w": 34,  "h": 34,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "LOGO.BMP",
+          "label": "", "fg": "0xFFFF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_title",       "type": "TEXT",      "x": 50,  "y": 6,   "w": 300, "h": 20,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "LaserMed Pro X7 - Safety Monitor", "fg": "0xFFFF", "bg": "0x0000", "font": 1,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "nav_bg",          "type": "RECT",      "x": 0,   "y": 48,  "w": 128, "h": 384,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_nav_dash",    "type": "BUTTON",    "x": 0,   "y": 48,  "w": 128, "h": 72,
+          "touch": {"x":0,"y":48,"w":128,"h":72}, "img": "NAV_D.BMP",
+          "label": "Dashboard", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "btn_nav_treat",   "type": "BUTTON",    "x": 0,   "y": 120, "w": 128, "h": 72,
+          "touch": {"x":0,"y":120,"w":128,"h":72}, "img": "NAV_T.BMP",
+          "label": "Treatment", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 1, "param": 0, "enabled": true },
+
+        { "id": "btn_nav_safety",  "type": "BUTTON",    "x": 0,   "y": 192, "w": 128, "h": 72,
+          "touch": {"x":0,"y":192,"w":128,"h":72}, "img": "NAV_SA.BMP",
+          "label": "Safety", "fg": "0x05DF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 2, "param": 0, "enabled": true },
+
+        { "id": "btn_nav_settings","type": "BUTTON",    "x": 0,   "y": 264, "w": 128, "h": 72,
+          "touch": {"x":0,"y":264,"w":128,"h":72}, "img": "NAV_G.BMP",
+          "label": "Settings", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 3, "param": 0, "enabled": true },
+
+        { "id": "safe1_bg",        "type": "IMAGE",     "x": 136, "y": 56,  "w": 222, "h": 120,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "SAFE_OK.BMP",
+          "label": "", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "ind_safe1",       "type": "IMAGE",     "x": 148, "y": 74,  "w": 14,  "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "DOT_G.BMP",
+          "label": "", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_safe1_name",  "type": "TEXT",      "x": 168, "y": 71,  "w": 176, "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Interlock System", "fg": "0xFFFF", "bg": "0x0000", "font": 1,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_safe1_val",   "type": "TEXT",      "x": 168, "y": 94,  "w": 100, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "OK", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "safe2_bg",        "type": "IMAGE",     "x": 366, "y": 56,  "w": 222, "h": 120,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "SAFE_OK.BMP",
+          "label": "", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "ind_safe2",       "type": "IMAGE",     "x": 378, "y": 74,  "w": 14,  "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "DOT_G.BMP",
+          "label": "", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_safe2_name",  "type": "TEXT",      "x": 398, "y": 71,  "w": 176, "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Emergency Stop", "fg": "0xFFFF", "bg": "0x0000", "font": 1,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_safe2_val",   "type": "TEXT",      "x": 398, "y": 94,  "w": 100, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "ARMED", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "safe3_bg",        "type": "IMAGE",     "x": 136, "y": 184, "w": 222, "h": 120,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "SAFE_OK.BMP",
+          "label": "", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "ind_safe3",       "type": "IMAGE",     "x": 148, "y": 202, "w": 14,  "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "DOT_G.BMP",
+          "label": "", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_safe3_name",  "type": "TEXT",      "x": 168, "y": 199, "w": 176, "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Safety Goggles", "fg": "0xFFFF", "bg": "0x0000", "font": 1,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_safe3_val",   "type": "TEXT",      "x": 168, "y": 222, "w": 120, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "DETECTED", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "safe4_bg",        "type": "IMAGE",     "x": 366, "y": 184, "w": 222, "h": 120,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "SAFE_OK.BMP",
+          "label": "", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "ind_safe4",       "type": "IMAGE",     "x": 378, "y": 202, "w": 14,  "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "DOT_G.BMP",
+          "label": "", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_safe4_name",  "type": "TEXT",      "x": 398, "y": 199, "w": 176, "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Coolant Flow", "fg": "0xFFFF", "bg": "0x0000", "font": 1,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_safe4_val",   "type": "TEXT",      "x": 398, "y": 222, "w": 100, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "NORMAL", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "safe5_bg",        "type": "IMAGE",     "x": 136, "y": 312, "w": 222, "h": 120,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "SAFE_WN.BMP",
+          "label": "", "fg": "0xFCC3", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "ind_safe5",       "type": "IMAGE",     "x": 148, "y": 330, "w": 14,  "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "DOT_O.BMP",
+          "label": "", "fg": "0xFCC3", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_safe5_name",  "type": "TEXT",      "x": 168, "y": 327, "w": 176, "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Beam Shutter", "fg": "0xFFFF", "bg": "0x0000", "font": 1,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_safe5_val",   "type": "TEXT",      "x": 168, "y": 350, "w": 100, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "OPEN", "fg": "0xFCC3", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "safe6_bg",        "type": "IMAGE",     "x": 366, "y": 312, "w": 222, "h": 120,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "SAFE_OK.BMP",
+          "label": "", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "ind_safe6",       "type": "IMAGE",     "x": 378, "y": 330, "w": 14,  "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "DOT_G.BMP",
+          "label": "", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_safe6_name",  "type": "TEXT",      "x": 398, "y": 327, "w": 176, "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Door Sensor", "fg": "0xFFFF", "bg": "0x0000", "font": 1,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_safe6_val",   "type": "TEXT",      "x": 398, "y": 350, "w": 100, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "CLOSED", "fg": "0x2730", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "estop_panel_bg",  "type": "RECT",      "x": 600, "y": 56,  "w": 196, "h": 376,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x2000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_estop_title", "type": "TEXT",      "x": 614, "y": 72,  "w": 168, "h": 18,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "EMERGENCY", "fg": "0xF9C7", "bg": "0x0000", "font": 1,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_estop",       "type": "BUTTON",    "x": 630, "y": 136, "w": 136, "h": 136,
+          "touch": {"x":614,"y":120,"w":168,"h":168}, "img": "BTN_ES.BMP",
+          "label": "STOP", "fg": "0xFFFF", "bg": "0xF9C7", "font": 2,
+          "action": "ACTION_EMERGENCY_STOP", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "lbl_estop_warn",  "type": "TEXT",      "x": 610, "y": 296, "w": 176, "h": 60,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Press to halt all laser emission immediately", "fg": "0xF9C7", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false }
+      ]
+    },
+
+    {
+      "page_id": 3,
+      "name": "SETTINGS",
+      "bg_color": "0x0884",
+      "elements": [
+
+        { "id": "hdr_bg",          "type": "RECT",      "x": 0,   "y": 0,   "w": 800, "h": 48,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "img_logo",        "type": "IMAGE",     "x": 8,   "y": 7,   "w": 34,  "h": 34,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "LOGO.BMP",
+          "label": "", "fg": "0xFFFF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_title",       "type": "TEXT",      "x": 50,  "y": 6,   "w": 280, "h": 20,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "LaserMed Pro X7 - Settings", "fg": "0xFFFF", "bg": "0x0000", "font": 1,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "nav_bg",          "type": "RECT",      "x": 0,   "y": 48,  "w": 128, "h": 384,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_nav_dash",    "type": "BUTTON",    "x": 0,   "y": 48,  "w": 128, "h": 72,
+          "touch": {"x":0,"y":48,"w":128,"h":72}, "img": "NAV_D.BMP",
+          "label": "Dashboard", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "btn_nav_treat",   "type": "BUTTON",    "x": 0,   "y": 120, "w": 128, "h": 72,
+          "touch": {"x":0,"y":120,"w":128,"h":72}, "img": "NAV_T.BMP",
+          "label": "Treatment", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 1, "param": 0, "enabled": true },
+
+        { "id": "btn_nav_safety",  "type": "BUTTON",    "x": 0,   "y": 192, "w": 128, "h": 72,
+          "touch": {"x":0,"y":192,"w":128,"h":72}, "img": "NAV_S.BMP",
+          "label": "Safety", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 2, "param": 0, "enabled": true },
+
+        { "id": "btn_nav_settings","type": "BUTTON",    "x": 0,   "y": 264, "w": 128, "h": 72,
+          "touch": {"x":0,"y":264,"w":128,"h":72}, "img": "NAV_GA.BMP",
+          "label": "Settings", "fg": "0x05DF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NAV_PAGE", "next_page": 3, "param": 0, "enabled": true },
+
+        { "id": "devinfo_bg",      "type": "RECT",      "x": 136, "y": 56,  "w": 300, "h": 368,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_devinfo",     "type": "TEXT",      "x": 146, "y": 66,  "w": 280, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "DEVICE INFORMATION", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_model_k",     "type": "TEXT",      "x": 146, "y": 94,  "w": 100, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Model", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_model_v",     "type": "TEXT",      "x": 256, "y": 94,  "w": 166, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "LX-700 Pro", "fg": "0xFFFF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_serial_k",    "type": "TEXT",      "x": 146, "y": 118, "w": 100, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Serial", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_serial_v",    "type": "TEXT",      "x": 256, "y": 118, "w": 166, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "SN-2024-0891", "fg": "0xFFFF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_fw_k",        "type": "TEXT",      "x": 146, "y": 142, "w": 100, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Firmware", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_fw_v",        "type": "TEXT",      "x": 256, "y": 142, "w": 166, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "v3.2.1 (2024-11)", "fg": "0xFFFF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_svc_k",       "type": "TEXT",      "x": 146, "y": 166, "w": 100, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Last Service", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_svc_v",       "type": "TEXT",      "x": 256, "y": 166, "w": 166, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "2024-11-15", "fg": "0xFFFF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_hrs_k",       "type": "TEXT",      "x": 146, "y": 190, "w": 100, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Hours Used", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_hrs_v",       "type": "TEXT",      "x": 256, "y": 190, "w": 166, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "1,247 hrs", "fg": "0xFFFF", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "calib_bg",        "type": "RECT",      "x": 444, "y": 56,  "w": 352, "h": 168,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_calib_title", "type": "TEXT",      "x": 454, "y": 66,  "w": 332, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "CALIBRATION", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_calib_last",  "type": "TEXT",      "x": 454, "y": 90,  "w": 332, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Last calibration: 2024-11-10", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_calib_due",   "type": "TEXT",      "x": 454, "y": 110, "w": 332, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "Next due: 2024-12-10  (16 days)", "fg": "0xFCC3", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_calibrate",   "type": "BUTTON",    "x": 454, "y": 136, "w": 332, "h": 72,
+          "touch": {"x":448,"y":130,"w":344,"h":84}, "img": "",
+          "label": "RUN CALIBRATION", "fg": "0xFFFF", "bg": "0x0480", "font": 1,
+          "action": "ACTION_CALIBRATE", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "bright_bg",       "type": "RECT",      "x": 444, "y": 232, "w": 352, "h": 100,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "", "fg": "0xFFFF", "bg": "0x10E6", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "lbl_bright",      "type": "TEXT",      "x": 454, "y": 242, "w": 332, "h": 14,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "DISPLAY BRIGHTNESS", "fg": "0x84B6", "bg": "0x0000", "font": 0,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_bright_down", "type": "BUTTON",    "x": 454, "y": 266, "w": 56,  "h": 56,
+          "touch": {"x":448,"y":260,"w":68,"h":68}, "img": "BTN_M.BMP",
+          "label": "-", "fg": "0xFFFF", "bg": "0x10E6", "font": 2,
+          "action": "ACTION_BRIGHTNESS_DOWN", "next_page": 0, "param": 0, "enabled": true },
+
+        { "id": "lbl_bright_val",  "type": "TEXT",      "x": 560, "y": 272, "w": 96,  "h": 44,
+          "touch": {"x":0,"y":0,"w":0,"h":0}, "img": "",
+          "label": "80%", "fg": "0xFFFF", "bg": "0x0000", "font": 2,
+          "action": "ACTION_NONE", "next_page": 0, "param": 0, "enabled": false },
+
+        { "id": "btn_bright_up",   "type": "BUTTON",    "x": 686, "y": 266, "w": 56,  "h": 56,
+          "touch": {"x":680,"y":260,"w":68,"h":68}, "img": "BTN_P.BMP",
+          "label": "+", "fg": "0xFFFF", "bg": "0x10E6", "font": 2,
+          "action": "ACTION_BRIGHTNESS_UP", "next_page": 0, "param": 0, "enabled": true }
+      ]
+    }
+
+  ]
+}

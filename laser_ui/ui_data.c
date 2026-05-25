@@ -1,0 +1,651 @@
+/**
+ * ui_data.c
+ * LaserMed Pro X7 — UI element data tables (all pages)
+ *
+ * Stored in flash (.rodata). sizeof(UIElement) = 112 bytes.
+ * Total flash usage (all pages) ≈ 170 elements × 112 = ~19 KB.
+ *
+ * Coordinate system:
+ *   Origin (0,0) = top-left of 800×480 display
+ *   touch.w == 0  →  element is non-interactive
+ *
+ * Layout zones:
+ *   Header    :  x=0,   y=0,   w=800, h=48
+ *   Nav sidebar:  x=0,   y=48,  w=128, h=384
+ *   Content   :  x=136, y=48,  w=664, h=384  (8 px gap after nav)
+ *   Status bar:  x=0,   y=432, w=800, h=48
+ */
+
+#include "ui_spec.h"
+#include <string.h>
+
+/* ------------------------------------------------------------------ */
+/*  Image filename table (index = ImgIdx enum value)                   */
+/* ------------------------------------------------------------------ */
+
+const char* const g_img_files[IMG_COUNT] = {
+    /* 0  */ "LOGO.BMP",
+    /* 1  */ "DOT_G.BMP",
+    /* 2  */ "DOT_R.BMP",
+    /* 3  */ "DOT_O.BMP",
+    /* 4  */ "PWR_ON.BMP",
+    /* 5  */ "PWR_OFF.BMP",
+    /* 6  */ "BTN_M.BMP",
+    /* 7  */ "BTN_P.BMP",
+    /* 8  */ "BTN_PS.BMP",
+    /* 9  */ "BTN_ST.BMP",
+    /* 10 */ "BTN_SR.BMP",
+    /* 11 */ "BTN_ES.BMP",
+    /* 12 */ "MD_CW.BMP",
+    /* 13 */ "MD_CWA.BMP",
+    /* 14 */ "MD_PW.BMP",
+    /* 15 */ "MD_PWA.BMP",
+    /* 16 */ "MD_SP.BMP",
+    /* 17 */ "MD_SPA.BMP",
+    /* 18 */ "MD_FR.BMP",
+    /* 19 */ "MD_FRA.BMP",
+    /* 20 */ "NAV_D.BMP",
+    /* 21 */ "NAV_DA.BMP",
+    /* 22 */ "NAV_T.BMP",
+    /* 23 */ "NAV_TA.BMP",
+    /* 24 */ "NAV_S.BMP",
+    /* 25 */ "NAV_SA.BMP",
+    /* 26 */ "NAV_G.BMP",
+    /* 27 */ "NAV_GA.BMP",
+    /* 28 */ "SAFE_OK.BMP",
+    /* 29 */ "SAFE_ER.BMP",
+    /* 30 */ "SAFE_WN.BMP",
+};
+
+/* ================================================================== */
+/*  PAGE 0 — DASHBOARD                                                 */
+/* ================================================================== */
+
+static const UIElement pg0_elems[] = {
+
+/* ── Header ──────────────────────────────────────────────────────── */
+{ 0,0,800,48, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+{ 8,7,34,34, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_LOGO,FONT_12,
+  ELEM_IMAGE, ACTION_NONE,0,0, 0,1, "" },
+
+{ 50,6,220,20, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_16,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "LaserMed Pro X7" },
+
+{ 50,28,260,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Medical Laser Control System  v3.2.1" },
+
+{ 688,17,14,14, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_DOT_GREEN,FONT_12,
+  ELEM_INDICATOR, ACTION_NONE,0,0, 0,1, "" },
+
+{ 708,15,56,18, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "READY" },
+
+{ 758,15,42,18, {0,0,0,0}, COL_ACCENT,COL_TRANSPARENT, IMG_NONE,FONT_16,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "14:32" },
+
+/* ── Left navigation sidebar ─────────────────────────────────────── */
+{ 0,48,128,384, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+/* Dashboard (ACTIVE on this page — uses _A image) */
+{ 0,48,128,72, {0,48,128,72}, COL_ACCENT,COL_TRANSPARENT, IMG_NAV_DASH_A,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,0,0, 1,1, "Dashboard" },
+
+{ 0,120,128,72, {0,120,128,72}, COL_GRAY,COL_TRANSPARENT, IMG_NAV_TREAT,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,1,0, 1,1, "Treatment" },
+
+{ 0,192,128,72, {0,192,128,72}, COL_GRAY,COL_TRANSPARENT, IMG_NAV_SAFE,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,2,0, 1,1, "Safety" },
+
+{ 0,264,128,72, {0,264,128,72}, COL_GRAY,COL_TRANSPARENT, IMG_NAV_SET,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,3,0, 1,1, "Settings" },
+
+/* ── Power Control card  (x=136,y=56,w=176,h=176) ───────────────── */
+{ 136,56,176,176, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+{ 146,66,156,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "POWER CONTROL" },
+
+/* Power toggle button: visual 72×72, touch 88×88 */
+{ 188,84,72,72, {180,76,88,88}, COL_GREEN,COL_GREEN_DIM, IMG_PWR_ON,FONT_16,
+  ELEM_BUTTON, ACTION_POWER_TOGGLE,0,0, 1,1, "ON" },
+
+{ 152,164,140,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "System Active" },
+
+{ 160,182,120,12, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "02:14:33" },
+
+/* ── Laser Intensity card  (x=320,y=56,w=240,h=176) ─────────────── */
+{ 320,56,240,176, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+{ 330,66,220,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "LASER INTENSITY" },
+
+{ 388,82,84,52, {0,0,0,0}, COL_ACCENT,COL_TRANSPARENT, IMG_NONE,FONT_40,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "75%" },
+
+/* [-] button: visual 44×44, touch 52×52 */
+{ 330,90,44,44, {326,86,52,52}, COL_ACCENT,COL_CARD_BG, IMG_BTN_MINUS,FONT_16,
+  ELEM_BUTTON, ACTION_INTENSITY_DOWN_1,0,0, 1,1, "-" },
+
+/* [+] button */
+{ 506,90,44,44, {502,86,52,52}, COL_ACCENT,COL_CARD_BG, IMG_BTN_PLUS,FONT_16,
+  ELEM_BUTTON, ACTION_INTENSITY_UP_1,0,0, 1,1, "+" },
+
+/* Slider track + fill (75% of 220 = 165 px) */
+{ 330,148,220,10, {0,0,0,0}, COL_WHITE,COL_CARD_BORDER, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+/* PROGRESS_BAR: label="75" (pct), param=220 (track_w) */
+{ 330,148,165,10, {0,0,0,0}, COL_ACCENT,COL_CARD_BORDER, IMG_NONE,FONT_12,
+  ELEM_PROGRESS_BAR, ACTION_NONE,0,220, 0,1, "75" },
+
+{ 330,162,30,12, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "0%" },
+
+{ 516,162,34,12, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "100%" },
+
+{ 330,180,220,26, {0,0,0,0}, COL_WHITE,COL_WARN_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+{ 336,186,208,14, {0,0,0,0}, COL_ORANGE,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "! High intensity - verify patient params" },
+
+/* ── Temperature card  (x=568,y=56,w=228,h=176) ─────────────────── */
+{ 568,56,228,176, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+{ 578,66,208,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "TEMPERATURE" },
+
+{ 598,86,168,52, {0,0,0,0}, COL_ACCENT,COL_TRANSPARENT, IMG_NONE,FONT_24,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "38.2 C" },
+
+{ 596,146,160,14, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Normal Range" },
+
+{ 578,166,208,10, {0,0,0,0}, COL_WHITE,COL_CARD_BORDER, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+/* 50% fill (38.2 in range 20-60) */
+{ 578,166,104,10, {0,0,0,0}, COL_GREEN,COL_CARD_BORDER, IMG_NONE,FONT_12,
+  ELEM_PROGRESS_BAR, ACTION_NONE,0,208, 0,1, "50" },
+
+{ 578,180,28,12, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "20" },
+
+{ 766,180,28,12, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "60" },
+
+{ 608,196,148,12, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Optimal: 35-42 C" },
+
+/* ── Treatment Mode card  (x=136,y=240,w=352,h=184) ─────────────── */
+{ 136,240,352,184, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+{ 146,250,332,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "TREATMENT MODE" },
+
+/* Mode buttons 80×146, touch 88×154; param = mode index */
+{ 144,270,80,146, {140,266,88,154}, COL_ACCENT,COL_TRANSPARENT, IMG_MODE_CW_A,FONT_12,
+  ELEM_BUTTON, ACTION_MODE_SELECT,0,0, 1,1, "CW\nContinuous" },
+
+{ 228,270,80,146, {224,266,88,154}, COL_GRAY,COL_TRANSPARENT, IMG_MODE_PW,FONT_12,
+  ELEM_BUTTON, ACTION_MODE_SELECT,0,1, 1,1, "PW\nPulse" },
+
+{ 312,270,80,146, {308,266,88,154}, COL_GRAY,COL_TRANSPARENT, IMG_MODE_SP,FONT_12,
+  ELEM_BUTTON, ACTION_MODE_SELECT,0,2, 1,1, "SP\nSuper Pulse" },
+
+{ 396,270,80,146, {392,266,88,154}, COL_GRAY,COL_TRANSPARENT, IMG_MODE_FR,FONT_12,
+  ELEM_BUTTON, ACTION_MODE_SELECT,0,3, 1,1, "FR\nFractional" },
+
+/* ── Treatment Timer card  (x=496,y=240,w=300,h=184) ────────────── */
+{ 496,240,300,184, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+{ 506,250,280,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "TREATMENT TIMER" },
+
+{ 556,268,130,52, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_40,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "05:30" },
+
+{ 561,322,120,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Remaining" },
+
+{ 506,344,280,8, {0,0,0,0}, COL_WHITE,COL_CARD_BORDER, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+/* 60% fill */
+{ 506,344,168,8, {0,0,0,0}, COL_PURPLE,COL_CARD_BORDER, IMG_NONE,FONT_12,
+  ELEM_PROGRESS_BAR, ACTION_NONE,0,280, 0,1, "60" },
+
+{ 551,356,140,12, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "60% complete" },
+
+/* PAUSE button: visual 144×46, touch 152×54 */
+{ 496,374,144,46, {492,370,152,54}, COL_ACCENT,COL_TRANSPARENT, IMG_BTN_PAUSE,FONT_16,
+  ELEM_BUTTON, ACTION_TIMER_PAUSE,0,0, 1,1, "PAUSE" },
+
+/* STOP button: visual 144×46, touch 152×54 */
+{ 648,374,144,46, {644,370,152,54}, COL_RED,COL_TRANSPARENT, IMG_BTN_STOP,FONT_16,
+  ELEM_BUTTON, ACTION_TIMER_STOP,0,0, 1,1, "STOP" },
+
+/* ── Status bar  (y=432,h=48) ────────────────────────────────────── */
+{ 0,432,800,48, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+{ 12,450,12,12, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_DOT_GREEN,FONT_12,
+  ELEM_INDICATOR, ACTION_NONE,0,0, 0,1, "" },
+
+{ 28,446,88,18, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Connected" },
+
+{ 128,440,1,28, {0,0,0,0}, COL_WHITE,COL_CARD_BORDER, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+{ 136,446,110,18, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Power: 75W" },
+
+{ 258,440,1,28, {0,0,0,0}, COL_WHITE,COL_CARD_BORDER, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+{ 266,446,120,18, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Temp: 38.2C" },
+
+{ 398,440,1,28, {0,0,0,0}, COL_WHITE,COL_CARD_BORDER, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+{ 406,446,140,18, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Session: 02:14:33" },
+
+{ 558,440,1,28, {0,0,0,0}, COL_WHITE,COL_CARD_BORDER, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+{ 566,446,100,18, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Safety: Armed" },
+
+{ 678,440,1,28, {0,0,0,0}, COL_WHITE,COL_CARD_BORDER, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+
+{ 686,446,90,18, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Online" },
+};
+
+/* ================================================================== */
+/*  PAGE 1 — TREATMENT CONTROL                                         */
+/* ================================================================== */
+
+static const UIElement pg1_elems[] = {
+
+/* ── Header ──────────────────────────────────────────────────────── */
+{ 0,0,800,48, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 8,7,34,34, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_LOGO,FONT_12,
+  ELEM_IMAGE, ACTION_NONE,0,0, 0,1, "" },
+{ 50,6,340,20, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_16,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "LaserMed Pro X7 - Treatment Control" },
+
+/* ── Nav (Treatment active) ───────────────────────────────────────── */
+{ 0,48,128,384, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 0,48,128,72, {0,48,128,72}, COL_GRAY,COL_TRANSPARENT, IMG_NAV_DASH,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,0,0, 1,1, "Dashboard" },
+{ 0,120,128,72, {0,120,128,72}, COL_ACCENT,COL_TRANSPARENT, IMG_NAV_TREAT_A,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,1,0, 1,1, "Treatment" },
+{ 0,192,128,72, {0,192,128,72}, COL_GRAY,COL_TRANSPARENT, IMG_NAV_SAFE,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,2,0, 1,1, "Safety" },
+{ 0,264,128,72, {0,264,128,72}, COL_GRAY,COL_TRANSPARENT, IMG_NAV_SET,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,3,0, 1,1, "Settings" },
+
+/* ── Left panel: Intensity control  (x=136,y=56,w=316,h=368) ─────── */
+{ 136,56,316,368, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 146,66,296,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "LASER INTENSITY CONTROL" },
+
+/* Big value */
+{ 196,98,140,64, {0,0,0,0}, COL_ACCENT,COL_TRANSPARENT, IMG_NONE,FONT_40,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "75%" },
+
+/* -10 / -1 / +1 / +10 buttons */
+{ 146,106,44,44, {140,100,56,56}, COL_WHITE,COL_CARD_BG, IMG_BTN_MINUS,FONT_12,
+  ELEM_BUTTON, ACTION_INTENSITY_DOWN_10,0,0, 1,1, "-10" },
+{ 154,164,44,44, {148,158,56,56}, COL_WHITE,COL_CARD_BG, IMG_BTN_MINUS,FONT_12,
+  ELEM_BUTTON, ACTION_INTENSITY_DOWN_1,0,0, 1,1, "-1" },
+{ 336,164,44,44, {330,158,56,56}, COL_WHITE,COL_CARD_BG, IMG_BTN_PLUS,FONT_12,
+  ELEM_BUTTON, ACTION_INTENSITY_UP_1,0,0, 1,1, "+1" },
+{ 344,106,44,44, {338,100,56,56}, COL_WHITE,COL_CARD_BG, IMG_BTN_PLUS,FONT_12,
+  ELEM_BUTTON, ACTION_INTENSITY_UP_10,0,0, 1,1, "+10" },
+
+/* Intensity bar */
+{ 146,222,296,24, {0,0,0,0}, COL_WHITE,COL_CARD_BORDER, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 146,222,222,24, {0,0,0,0}, COL_ACCENT,COL_CARD_BORDER, IMG_NONE,FONT_12,
+  ELEM_PROGRESS_BAR, ACTION_NONE,0,296, 0,1, "75" },
+
+{ 166,260,256,14, {0,0,0,0}, COL_ACCENT,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Mode: Continuous Wave (CW)" },
+
+/* START TREATMENT — big green button */
+{ 146,358,296,66, {140,352,308,78}, COL_WHITE,COL_GREEN, IMG_BTN_START,FONT_24,
+  ELEM_BUTTON, ACTION_TIMER_START,0,0, 1,1, "START TREATMENT" },
+
+/* ── Right panel: Pulse Parameters  (x=460,y=56,w=336,h=368) ─────── */
+{ 460,56,336,368, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 470,66,316,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "PULSE PARAMETERS" },
+
+/* Frequency box */
+{ 468,88,156,152, {0,0,0,0}, COL_WHITE,COL_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 478,98,136,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "FREQUENCY" },
+{ 490,122,80,40, {0,0,0,0}, COL_ACCENT,COL_TRANSPARENT, IMG_NONE,FONT_24,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "10" },
+{ 540,138,36,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Hz" },
+{ 468,180,44,44, {464,176,52,52}, COL_WHITE,COL_CARD_BG, IMG_BTN_MINUS,FONT_16,
+  ELEM_BUTTON, ACTION_FREQ_DOWN,0,0, 1,1, "-" },
+{ 576,180,44,44, {572,176,52,52}, COL_WHITE,COL_CARD_BG, IMG_BTN_PLUS,FONT_16,
+  ELEM_BUTTON, ACTION_FREQ_UP,0,0, 1,1, "+" },
+
+/* Pulse Width box */
+{ 632,88,156,152, {0,0,0,0}, COL_WHITE,COL_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 642,98,136,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "PULSE WIDTH" },
+{ 650,122,80,40, {0,0,0,0}, COL_ACCENT,COL_TRANSPARENT, IMG_NONE,FONT_24,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "100" },
+{ 716,138,36,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "us" },
+{ 632,180,44,44, {628,176,52,52}, COL_WHITE,COL_CARD_BG, IMG_BTN_MINUS,FONT_16,
+  ELEM_BUTTON, ACTION_PULSEWIDTH_DOWN,0,0, 1,1, "-" },
+{ 740,180,44,44, {736,176,52,52}, COL_WHITE,COL_CARD_BG, IMG_BTN_PLUS,FONT_16,
+  ELEM_BUTTON, ACTION_PULSEWIDTH_UP,0,0, 1,1, "+" },
+
+/* Duty Cycle box */
+{ 468,252,156,152, {0,0,0,0}, COL_WHITE,COL_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 478,262,136,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "DUTY CYCLE" },
+{ 490,286,80,40, {0,0,0,0}, COL_ACCENT,COL_TRANSPARENT, IMG_NONE,FONT_24,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "10" },
+{ 540,302,20,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "%" },
+{ 468,344,44,44, {464,340,52,52}, COL_WHITE,COL_CARD_BG, IMG_BTN_MINUS,FONT_16,
+  ELEM_BUTTON, ACTION_DUTYCYCLE_DOWN,0,0, 1,1, "-" },
+{ 576,344,44,44, {572,340,52,52}, COL_WHITE,COL_CARD_BG, IMG_BTN_PLUS,FONT_16,
+  ELEM_BUTTON, ACTION_DUTYCYCLE_UP,0,0, 1,1, "+" },
+
+/* Peak Power box */
+{ 632,252,156,152, {0,0,0,0}, COL_WHITE,COL_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 642,262,136,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "PEAK POWER" },
+{ 650,286,80,40, {0,0,0,0}, COL_ACCENT,COL_TRANSPARENT, IMG_NONE,FONT_24,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "50" },
+{ 710,302,24,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "W" },
+{ 632,344,44,44, {628,340,52,52}, COL_WHITE,COL_CARD_BG, IMG_BTN_MINUS,FONT_16,
+  ELEM_BUTTON, ACTION_PEAKPOWER_DOWN,0,0, 1,1, "-" },
+{ 740,344,44,44, {736,340,52,52}, COL_WHITE,COL_CARD_BG, IMG_BTN_PLUS,FONT_16,
+  ELEM_BUTTON, ACTION_PEAKPOWER_UP,0,0, 1,1, "+" },
+};
+
+/* ================================================================== */
+/*  PAGE 2 — SAFETY MONITOR                                            */
+/* ================================================================== */
+
+static const UIElement pg2_elems[] = {
+
+/* Header */
+{ 0,0,800,48, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 8,7,34,34, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_LOGO,FONT_12,
+  ELEM_IMAGE, ACTION_NONE,0,0, 0,1, "" },
+{ 50,6,320,20, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_16,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "LaserMed Pro X7 - Safety Monitor" },
+
+/* Nav (Safety active) */
+{ 0,48,128,384, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 0,48,128,72, {0,48,128,72}, COL_GRAY,COL_TRANSPARENT, IMG_NAV_DASH,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,0,0, 1,1, "Dashboard" },
+{ 0,120,128,72, {0,120,128,72}, COL_GRAY,COL_TRANSPARENT, IMG_NAV_TREAT,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,1,0, 1,1, "Treatment" },
+{ 0,192,128,72, {0,192,128,72}, COL_ACCENT,COL_TRANSPARENT, IMG_NAV_SAFE_A,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,2,0, 1,1, "Safety" },
+{ 0,264,128,72, {0,264,128,72}, COL_GRAY,COL_TRANSPARENT, IMG_NAV_SET,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,3,0, 1,1, "Settings" },
+
+/* Safety item 1: Interlock  (x=136,y=56) */
+{ 136,56,222,120, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_SAFE_OK,FONT_12,
+  ELEM_IMAGE, ACTION_NONE,0,0, 0,1, "" },
+{ 148,74,14,14, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_DOT_GREEN,FONT_12,
+  ELEM_INDICATOR, ACTION_NONE,0,0, 0,1, "" },
+{ 168,71,176,18, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_16,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Interlock System" },
+{ 168,94,100,14, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "OK" },
+
+/* Safety item 2: Emergency Stop  (x=366,y=56) */
+{ 366,56,222,120, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_SAFE_OK,FONT_12,
+  ELEM_IMAGE, ACTION_NONE,0,0, 0,1, "" },
+{ 378,74,14,14, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_DOT_GREEN,FONT_12,
+  ELEM_INDICATOR, ACTION_NONE,0,0, 0,1, "" },
+{ 398,71,176,18, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_16,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Emergency Stop" },
+{ 398,94,100,14, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "ARMED" },
+
+/* Safety item 3: Safety Goggles  (x=136,y=184) */
+{ 136,184,222,120, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_SAFE_OK,FONT_12,
+  ELEM_IMAGE, ACTION_NONE,0,0, 0,1, "" },
+{ 148,202,14,14, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_DOT_GREEN,FONT_12,
+  ELEM_INDICATOR, ACTION_NONE,0,0, 0,1, "" },
+{ 168,199,176,18, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_16,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Safety Goggles" },
+{ 168,222,120,14, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "DETECTED" },
+
+/* Safety item 4: Coolant Flow  (x=366,y=184) */
+{ 366,184,222,120, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_SAFE_OK,FONT_12,
+  ELEM_IMAGE, ACTION_NONE,0,0, 0,1, "" },
+{ 378,202,14,14, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_DOT_GREEN,FONT_12,
+  ELEM_INDICATOR, ACTION_NONE,0,0, 0,1, "" },
+{ 398,199,176,18, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_16,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Coolant Flow" },
+{ 398,222,100,14, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "NORMAL" },
+
+/* Safety item 5: Beam Shutter — WARN  (x=136,y=312) */
+{ 136,312,222,120, {0,0,0,0}, COL_ORANGE,COL_TRANSPARENT, IMG_SAFE_WARN,FONT_12,
+  ELEM_IMAGE, ACTION_NONE,0,0, 0,1, "" },
+{ 148,330,14,14, {0,0,0,0}, COL_ORANGE,COL_TRANSPARENT, IMG_DOT_ORANGE,FONT_12,
+  ELEM_INDICATOR, ACTION_NONE,0,0, 0,1, "" },
+{ 168,327,176,18, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_16,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Beam Shutter" },
+{ 168,350,100,14, {0,0,0,0}, COL_ORANGE,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "OPEN" },
+
+/* Safety item 6: Door Sensor  (x=366,y=312) */
+{ 366,312,222,120, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_SAFE_OK,FONT_12,
+  ELEM_IMAGE, ACTION_NONE,0,0, 0,1, "" },
+{ 378,330,14,14, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_DOT_GREEN,FONT_12,
+  ELEM_INDICATOR, ACTION_NONE,0,0, 0,1, "" },
+{ 398,327,176,18, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_16,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Door Sensor" },
+{ 398,350,100,14, {0,0,0,0}, COL_GREEN,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "CLOSED" },
+
+/* ── Emergency STOP panel  (x=600,y=56,w=196,h=376) ─────────────── */
+{ 600,56,196,376, {0,0,0,0}, COL_WHITE,COL_RED_DIM, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 614,72,168,18, {0,0,0,0}, COL_RED,COL_TRANSPARENT, IMG_NONE,FONT_16,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "EMERGENCY" },
+
+/* E-STOP button: visual 136×136, touch 168×168 */
+{ 630,136,136,136, {614,120,168,168}, COL_WHITE,COL_RED, IMG_BTN_ESTOP,FONT_24,
+  ELEM_BUTTON, ACTION_EMERGENCY_STOP,0,0, 1,1, "STOP" },
+
+{ 610,296,176,60, {0,0,0,0}, COL_RED,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Press to halt all laser emission immediately" },
+};
+
+/* ================================================================== */
+/*  PAGE 3 — SETTINGS                                                  */
+/* ================================================================== */
+
+static const UIElement pg3_elems[] = {
+
+/* Header */
+{ 0,0,800,48, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 8,7,34,34, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_LOGO,FONT_12,
+  ELEM_IMAGE, ACTION_NONE,0,0, 0,1, "" },
+{ 50,6,280,20, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_16,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "LaserMed Pro X7 - Settings" },
+
+/* Nav (Settings active) */
+{ 0,48,128,384, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 0,48,128,72, {0,48,128,72}, COL_GRAY,COL_TRANSPARENT, IMG_NAV_DASH,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,0,0, 1,1, "Dashboard" },
+{ 0,120,128,72, {0,120,128,72}, COL_GRAY,COL_TRANSPARENT, IMG_NAV_TREAT,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,1,0, 1,1, "Treatment" },
+{ 0,192,128,72, {0,192,128,72}, COL_GRAY,COL_TRANSPARENT, IMG_NAV_SAFE,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,2,0, 1,1, "Safety" },
+{ 0,264,128,72, {0,264,128,72}, COL_ACCENT,COL_TRANSPARENT, IMG_NAV_SET_A,FONT_12,
+  ELEM_BUTTON, ACTION_NAV_PAGE,3,0, 1,1, "Settings" },
+
+/* ── Device Info panel  (x=136,y=56,w=300,h=368) ─────────────────── */
+{ 136,56,300,368, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 146,66,280,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "DEVICE INFORMATION" },
+
+/* Key-value rows */
+{ 146,94,100,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Model" },
+{ 256,94,166,14, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "LX-700 Pro" },
+
+{ 146,118,100,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Serial" },
+{ 256,118,166,14, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "SN-2024-0891" },
+
+{ 146,142,100,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Firmware" },
+{ 256,142,166,14, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "v3.2.1 (2024-11)" },
+
+{ 146,166,100,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Last Service" },
+{ 256,166,166,14, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "2024-11-15" },
+
+{ 146,190,100,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Hours Used" },
+{ 256,190,166,14, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "1,247 hrs" },
+
+/* ── Calibration panel  (x=444,y=56,w=352,h=168) ─────────────────── */
+{ 444,56,352,168, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 454,66,332,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "CALIBRATION" },
+{ 454,90,332,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Last calibration: 2024-11-10" },
+{ 454,110,332,14, {0,0,0,0}, COL_ORANGE,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "Next due: 2024-12-10  (16 days)" },
+
+/* RUN CALIBRATION button: visual 332×72, touch 344×84 */
+{ 454,136,332,72, {448,130,344,84}, COL_WHITE,COL_GREEN_DIM, IMG_NONE,FONT_16,
+  ELEM_BUTTON, ACTION_CALIBRATE,0,0, 1,1, "RUN CALIBRATION" },
+
+/* ── Brightness panel  (x=444,y=232,w=352,h=100) ─────────────────── */
+{ 444,232,352,100, {0,0,0,0}, COL_WHITE,COL_CARD_BG, IMG_NONE,FONT_12,
+  ELEM_RECT, ACTION_NONE,0,0, 0,1, "" },
+{ 454,242,332,14, {0,0,0,0}, COL_GRAY,COL_TRANSPARENT, IMG_NONE,FONT_12,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "DISPLAY BRIGHTNESS" },
+
+/* [-] visual 56×56, touch 68×68 */
+{ 454,266,56,56, {448,260,68,68}, COL_WHITE,COL_CARD_BG, IMG_BTN_MINUS,FONT_24,
+  ELEM_BUTTON, ACTION_BRIGHTNESS_DOWN,0,0, 1,1, "-" },
+
+{ 560,272,96,44, {0,0,0,0}, COL_WHITE,COL_TRANSPARENT, IMG_NONE,FONT_24,
+  ELEM_TEXT, ACTION_NONE,0,0, 0,1, "80%" },
+
+/* [+] visual 56×56, touch 68×68 */
+{ 686,266,56,56, {680,260,68,68}, COL_WHITE,COL_CARD_BG, IMG_BTN_PLUS,FONT_24,
+  ELEM_BUTTON, ACTION_BRIGHTNESS_UP,0,0, 1,1, "+" },
+};
+
+/* ================================================================== */
+/*  Page descriptors and application root                              */
+/* ================================================================== */
+
+static const UIPage g_pages[PAGE_COUNT] = {
+    {
+        .page_id    = 0,
+        .bg_color   = COL_BG,
+        .elem_count = sizeof(pg0_elems) / sizeof(pg0_elems[0]),
+        .name       = "DASHBOARD",
+        .elements   = pg0_elems,
+    },
+    {
+        .page_id    = 1,
+        .bg_color   = COL_BG,
+        .elem_count = sizeof(pg1_elems) / sizeof(pg1_elems[0]),
+        .name       = "TREATMENT CONTROL",
+        .elements   = pg1_elems,
+    },
+    {
+        .page_id    = 2,
+        .bg_color   = COL_BG,
+        .elem_count = sizeof(pg2_elems) / sizeof(pg2_elems[0]),
+        .name       = "SAFETY MONITOR",
+        .elements   = pg2_elems,
+    },
+    {
+        .page_id    = 3,
+        .bg_color   = COL_BG,
+        .elem_count = sizeof(pg3_elems) / sizeof(pg3_elems[0]),
+        .name       = "SETTINGS",
+        .elements   = pg3_elems,
+    },
+};
+
+const UIApp g_app = {
+    .page_count = PAGE_COUNT,
+    .pages      = g_pages,
+};
+
+/* ================================================================== */
+/*  Runtime helpers                                                     */
+/* ================================================================== */
+
+ActionID UI_Dispatch(const UIPage* page, uint16_t px, uint16_t py,
+                     const UIElement** hit_out)
+{
+    if (hit_out) *hit_out = 0;
+    if (!page) return ACTION_NONE;
+
+    for (uint8_t i = 0; i < page->elem_count; i++) {
+        const UIElement* e = &page->elements[i];
+        if (UI_HitTest(e, px, py)) {
+            if (hit_out) *hit_out = e;
+            return (ActionID)e->action;
+        }
+    }
+    return ACTION_NONE;
+}
