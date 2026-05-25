@@ -13,6 +13,8 @@ public class SmsReceiver extends BroadcastReceiver {
 
     private static final String TAG = "SmsBat";
     private static final String SMS_RECEIVED = "android.provider.Telephony.SMS_RECEIVED";
+    // هر پیام بات با این شروع می‌شه تا حلقه تشخیص داده بشه
+    private static final String BOT_STAMP = "​"; // zero-width space نامرئی
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -34,15 +36,38 @@ public class SmsReceiver extends BroadcastReceiver {
         }
 
         String text = body.toString();
+
+        // اگه پیام از خود بات بود (شامل zero-width space) → حلقه رو متوقف کن
+        if (text.contains(BOT_STAMP)) {
+            Log.d(TAG, "پیام بات تشخیص داده شد، جواب نمی‌ده");
+            return;
+        }
+
+        // اگه پیام در ۳ ثانیه گذشته ارسال شده بود → جلوگیری از حلقه
+        long lastSent = prefs.getLong("last_sent_time", 0);
+        String lastReply = prefs.getString("last_sent_text", "");
+        if (System.currentTimeMillis() - lastSent < 3000 && text.equals(lastReply)) {
+            Log.d(TAG, "پیام تکراری اخیر، جواب نمی‌ده");
+            return;
+        }
+
         Log.d(TAG, "پیام از " + sender + ": " + text);
         SmsLogger.save(context, sender, text, true);
 
-        String reply = BotRules.getReply(text);
+        // جواب بات + کاراکتر نامرئی برای شناسایی
+        String reply = BOT_STAMP + BotRules.getReply(text);
         try {
             SmsManager sm = SmsManager.getDefault();
             ArrayList<String> parts = sm.divideMessage(reply);
             sm.sendMultipartTextMessage(sender, null, parts, null, null);
-            SmsLogger.save(context, sender, reply, false);
+
+            // ذخیره زمان و متن آخرین ارسال
+            prefs.edit()
+                .putLong("last_sent_time", System.currentTimeMillis())
+                .putString("last_sent_text", text)
+                .apply();
+
+            SmsLogger.save(context, sender, reply.substring(1), false); // بدون stamp ذخیره کن
             Log.d(TAG, "جواب ارسال شد: " + reply);
         } catch (Exception e) {
             Log.e(TAG, "خطا در ارسال: " + e.getMessage());
