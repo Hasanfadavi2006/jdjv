@@ -30,7 +30,6 @@ public class MainActivity extends Activity {
         Manifest.permission.SEND_SMS
     };
 
-    private ListView listView;
     private Button toggleBtn;
     private TextView statusTv;
     private ArrayAdapter<String> adapter;
@@ -72,7 +71,7 @@ public class MainActivity extends Activity {
         logLabel.setPadding(0, 24, 0, 8);
         root.addView(logLabel);
 
-        listView = new ListView(this);
+        ListView listView = new ListView(this);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
         listView.setLayoutParams(lp);
@@ -94,7 +93,6 @@ public class MainActivity extends Activity {
                 boolean cur = prefs.getBoolean("enabled", true);
                 prefs.edit().putBoolean("enabled", !cur).apply();
                 updateStatus();
-                if (!cur) startService(new Intent(MainActivity.this, SmsBotService.class));
             }
         });
     }
@@ -132,14 +130,10 @@ public class MainActivity extends Activity {
     private void checkPermissions() {
         List<String> missing = new ArrayList<String>();
         for (String p : PERMS) {
-            if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) {
-                missing.add(p);
-            }
+            if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) missing.add(p);
         }
         if (!missing.isEmpty()) {
             requestPermissions(missing.toArray(new String[0]), REQ_PERM);
-        } else {
-            startService(new Intent(this, SmsBotService.class));
         }
     }
 
@@ -150,7 +144,6 @@ public class MainActivity extends Activity {
             if (r != PackageManager.PERMISSION_GRANTED) { allOk = false; break; }
         }
         if (allOk) {
-            startService(new Intent(this, SmsBotService.class));
             Toast.makeText(this, "دسترسی‌ها تایید شد", Toast.LENGTH_SHORT).show();
         } else {
             Toast.makeText(this, "بات بدون دسترسی SMS کار نمی‌کند", Toast.LENGTH_LONG).show();
