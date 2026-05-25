@@ -46,18 +46,23 @@ $AAPT package -f \
 echo "=== مرحله ۵: تراز کردن APK (قبل از امضا) ==="
 $ZIPALIGN -f 4 $OUT/app-unsigned.apk $OUT/app-aligned.apk
 
-echo "=== مرحله ۶: تولید کلید امضا ==="
-KEYSTORE=$OUT/debug.keystore
-keytool -genkey -v \
-    -keystore $KEYSTORE \
-    -alias smsbot \
-    -keyalg RSA \
-    -keysize 2048 \
-    -validity 10000 \
-    -storepass android \
-    -keypass android \
-    -dname "CN=SmsBat, OU=Dev, O=jdjv, L=Tehran, S=Tehran, C=IR" \
-    2>/dev/null
+echo "=== مرحله ۶: تولید کلید امضا (دائمی) ==="
+KEYSTORE=/home/user/jdjv/smsbot.keystore
+if [ ! -f $KEYSTORE ]; then
+    keytool -genkey -v \
+        -keystore $KEYSTORE \
+        -alias smsbot \
+        -keyalg RSA \
+        -keysize 2048 \
+        -validity 10000 \
+        -storepass android \
+        -keypass android \
+        -dname "CN=SmsBat, OU=Dev, O=jdjv, L=Tehran, S=Tehran, C=IR" \
+        2>/dev/null
+    echo "کلید جدید ساخته شد."
+else
+    echo "از کلید موجود استفاده می‌شه."
+fi
 
 echo "=== مرحله ۷: امضای APK (آخرین مرحله) ==="
 $APKSIGNER sign \
