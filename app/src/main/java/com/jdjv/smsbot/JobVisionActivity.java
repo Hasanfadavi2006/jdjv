@@ -203,6 +203,8 @@ public class JobVisionActivity extends Activity {
     // ─── مدیریت صفحات ────────────────────────────────────────────────────────
     private void handlePage(String url) {
         if (url.contains("account.jobvision.ir") && state == STATE_LOGIN) {
+            // هر بار که صفحه account لود شد doLogin صدا بزن
+            // (مرحله ۱: ایمیل - مرحله ۲: پسورد - هر دو با همین تابع کنترل می‌شن)
             doLogin();
 
         } else if (url.contains("employer.jobvision.ir") && state == STATE_LOGIN) {
@@ -226,48 +228,63 @@ public class JobVisionActivity extends Activity {
         }
     }
 
-    // ─── لاگین ───────────────────────────────────────────────────────────────
+    // ─── لاگین (دو مرحله‌ای: اول ایمیل، بعد پسورد) ──────────────────────────
     private void doLogin() {
-        log("در حال پر کردن فرم لاگین...");
-        // تلاش با چند سلکتور مختلف برای سازگاری با سایت
+        log("بررسی فرم لاگین...");
+        // جاب‌ویژن دو مرحله دارد: ابتدا فقط ایمیل، سپس پسورد
+        // بررسی می‌کنیم الان کدام مرحله هستیم
         String js =
             "(function() {" +
-            "  var filled = false;" +
-            "  var selectors = [" +
-            "    {e: 'input[type=email]', p: 'input[type=password]'}," +
-            "    {e: 'input[name=Email]', p: 'input[name=Password]'}," +
-            "    {e: 'input[id*=email]', p: 'input[id*=password]'}," +
-            "    {e: 'input[id*=Email]', p: 'input[id*=Password]'}," +
-            "    {e: 'input[placeholder*=ایمیل]', p: 'input[placeholder*=رمز]'}," +
-            "    {e: 'input[placeholder*=email]', p: 'input[type=password]'}" +
-            "  ];" +
-            "  for (var i = 0; i < selectors.length; i++) {" +
-            "    var eEl = document.querySelector(selectors[i].e);" +
-            "    var pEl = document.querySelector(selectors[i].p);" +
-            "    if (eEl && pEl) {" +
-            "      var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;" +
-            "      setter.call(eEl, '" + EMAIL + "'); eEl.dispatchEvent(new Event('input',{bubbles:true}));" +
-            "      setter.call(pEl, '" + PASSWORD + "'); pEl.dispatchEvent(new Event('input',{bubbles:true}));" +
-            "      Android.onLog('فیلدها پر شدند (selector ' + i + ')');" +
-            "      filled = true; break;" +
-            "    }" +
-            "  }" +
-            "  if (!filled) {" +
-            "    Android.onLog('فرم پیدا نشد - inputs روی صفحه: ' + document.querySelectorAll('input').length);" +
+            "  var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;" +
+            "  var inputs = document.querySelectorAll('input:not([type=hidden])');" +
+            "  Android.onLog('تعداد inputs: ' + inputs.length);" +
+            // اگه پسورد وجود داشت: مرحله دوم
+            "  var passEl = document.querySelector('input[type=password]');" +
+            "  if (passEl) {" +
+            "    setter.call(passEl, '" + PASSWORD + "');" +
+            "    passEl.dispatchEvent(new Event('input',{bubbles:true}));" +
+            "    passEl.dispatchEvent(new Event('change',{bubbles:true}));" +
+            "    Android.onLog('مرحله ۲: پسورد وارد شد');" +
+            "    setTimeout(function() {" +
+            "      var btn = document.querySelector('button[type=submit]') || document.querySelector('button');" +
+            "      if(btn){ btn.click(); Android.onLog('دکمه ورود کلیک شد'); }" +
+            "    }, 800);" +
             "    return;" +
             "  }" +
+            // مرحله اول: فقط ایمیل
+            "  var emailEl = inputs[0];" +
+            "  if (!emailEl) { Android.onLog('هیچ input‌ای پیدا نشد'); return; }" +
+            "  setter.call(emailEl, '" + EMAIL + "');" +
+            "  emailEl.dispatchEvent(new Event('input',{bubbles:true}));" +
+            "  emailEl.dispatchEvent(new Event('change',{bubbles:true}));" +
+            "  Android.onLog('مرحله ۱: ایمیل وارد شد');" +
             "  setTimeout(function() {" +
-            "    var btn = document.querySelector('button[type=submit]') ||" +
-            "              document.querySelector('input[type=submit]') ||" +
-            "              document.querySelector('button.btn-primary') ||" +
-            "              document.querySelector('button.login') ||" +
-            "              document.querySelector('button:last-of-type');" +
-            "    if (btn) { btn.click(); Android.onLog('دکمه submit کلیک شد'); }" +
-            "    else { Android.onLog('دکمه submit پیدا نشد'); }" +
-            "  }, 1000);" +
+            "    var btn = document.querySelector('button[type=submit]') || document.querySelector('button');" +
+            "    if(btn){ btn.click(); Android.onLog('دکمه بعدی کلیک شد'); }" +
+            "    else { Android.onLog('دکمه پیدا نشد'); }" +
+            "  }, 800);" +
             "})();";
         webView.evaluateJavascript(js, null);
-        state = STATE_DASHBOARD; // منتظر redirect
+        // state رو STATE_LOGIN نگه می‌داریم تا مرحله دوم هم اجرا بشه
+    }
+
+    private void doLoginStep2() {
+        log("مرحله ۲: وارد کردن پسورد...");
+        String js =
+            "(function() {" +
+            "  var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;" +
+            "  var passEl = document.querySelector('input[type=password]');" +
+            "  if (!passEl) { Android.onLog('فیلد پسورد پیدا نشد'); return; }" +
+            "  setter.call(passEl, '" + PASSWORD + "');" +
+            "  passEl.dispatchEvent(new Event('input',{bubbles:true}));" +
+            "  passEl.dispatchEvent(new Event('change',{bubbles:true}));" +
+            "  Android.onLog('پسورد وارد شد');" +
+            "  setTimeout(function() {" +
+            "    var btn = document.querySelector('button[type=submit]') || document.querySelector('button');" +
+            "    if(btn){ btn.click(); Android.onLog('دکمه ورود کلیک شد'); }" +
+            "  }, 800);" +
+            "})();";
+        webView.evaluateJavascript(js, null);
     }
 
     // ─── رفتن به لیست درخواست‌ها ─────────────────────────────────────────────
