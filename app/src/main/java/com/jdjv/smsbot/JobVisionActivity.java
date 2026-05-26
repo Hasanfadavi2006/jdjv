@@ -103,7 +103,7 @@ public class JobVisionActivity extends Activity {
 
         toggleWebBtn = new Button(this);
         toggleWebBtn.setText("نمایش مرورگر");
-        toggleWebBtn.setBackgroundColor(Color.parseColor("#444"));
+        toggleWebBtn.setBackgroundColor(Color.parseColor("#444444"));
         toggleWebBtn.setTextColor(Color.WHITE);
         lp(toggleWebBtn, 4);
         root.addView(toggleWebBtn);
