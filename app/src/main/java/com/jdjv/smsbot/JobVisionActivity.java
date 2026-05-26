@@ -101,12 +101,42 @@ public class JobVisionActivity extends Activity {
         lp(startBtn, 8);
         root.addView(startBtn);
 
+        // ردیف دکمه‌های مرورگر + کپی لاگ
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rowLp.setMargins(0, 4, 0, 0);
+        btnRow.setLayoutParams(rowLp);
+
         toggleWebBtn = new Button(this);
         toggleWebBtn.setText("نمایش مرورگر");
         toggleWebBtn.setBackgroundColor(Color.parseColor("#444444"));
         toggleWebBtn.setTextColor(Color.WHITE);
-        lp(toggleWebBtn, 4);
-        root.addView(toggleWebBtn);
+        toggleWebBtn.setTextSize(12);
+        LinearLayout.LayoutParams twLp = new LinearLayout.LayoutParams(0,
+            LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        twLp.setMargins(0, 0, 4, 0);
+        toggleWebBtn.setLayoutParams(twLp);
+        btnRow.addView(toggleWebBtn);
+
+        final Button copyLogBtn = new Button(this);
+        copyLogBtn.setText("کپی لاگ");
+        copyLogBtn.setBackgroundColor(Color.parseColor("#1565C0"));
+        copyLogBtn.setTextColor(Color.WHITE);
+        copyLogBtn.setTextSize(12);
+        LinearLayout.LayoutParams clLp = new LinearLayout.LayoutParams(0,
+            LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        copyLogBtn.setLayoutParams(clLp);
+        btnRow.addView(copyLogBtn);
+        root.addView(btnRow);
+
+        // WebView - تمام صفحه وقتی نمایش داده می‌شه
+        webView = new WebView(this);
+        LinearLayout.LayoutParams wlp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 0);
+        webView.setLayoutParams(wlp);
+        root.addView(webView);
 
         logScroll = new ScrollView(this);
         LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
@@ -120,13 +150,6 @@ public class JobVisionActivity extends Activity {
         logTv.setBackgroundColor(Color.parseColor("#161b22"));
         logScroll.addView(logTv);
         root.addView(logScroll);
-
-        // WebView با ارتفاع صفر (مخفی) - با دکمه قابل نمایشه
-        webView = new WebView(this);
-        LinearLayout.LayoutParams wlp = new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 0);
-        webView.setLayoutParams(wlp);
-        root.addView(webView);
 
         setContentView(root);
 
@@ -145,11 +168,26 @@ public class JobVisionActivity extends Activity {
         toggleWebBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 webViewVisible = !webViewVisible;
-                LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(
+                // وقتی مرورگر نمایش داده می‌شه تمام صفحه می‌شه
+                LinearLayout.LayoutParams wp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    webViewVisible ? 600 : 0);
-                webView.setLayoutParams(p);
+                    webViewVisible ? LinearLayout.LayoutParams.MATCH_PARENT : 0);
+                webView.setLayoutParams(wp);
+                LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    webViewVisible ? 0 : 0, webViewVisible ? 0f : 1f);
+                logScroll.setLayoutParams(lp2);
                 toggleWebBtn.setText(webViewVisible ? "مخفی کردن مرورگر" : "نمایش مرورگر");
+            }
+        });
+
+        copyLogBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                android.content.ClipboardManager cm =
+                    (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("log",
+                    logTv.getText().toString()));
+                Toast.makeText(JobVisionActivity.this, "لاگ کپی شد", Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -183,7 +221,7 @@ public class JobVisionActivity extends Activity {
                 log("صفحه: " + url);
                 handler.postDelayed(new Runnable() {
                     @Override public void run() { handlePage(url); }
-                }, 2500);
+                }, 4000);
             }
         });
     }
@@ -257,61 +295,72 @@ public class JobVisionActivity extends Activity {
         }
     }
 
-    // ─── لاگین (دو مرحله‌ای: اول ایمیل، بعد پسورد) ──────────────────────────
+    // ─── لاگین (دو مرحله‌ای) ──────────────────────────────────────────────────
     private void doLogin() {
         log("بررسی فرم لاگین...");
         String js =
-            "(function() {" +
-            // ─ تشخیص صفحه ─
+            "(function tryFill(depth) {" +
+            "  if(depth===undefined) depth=0;" +
             "  var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;" +
-            "  var inputs  = document.querySelectorAll('input:not([type=hidden])');" +
-            "  var buttons = document.querySelectorAll('button,input[type=submit],[role=button]');" +
-            "  var info = 'inputs:' + inputs.length + ' buttons:' + buttons.length;" +
-            "  for(var i=0;i<inputs.length;i++){" +
-            "    info += ' | input['+i+'] type='+inputs[i].type+' ph='+inputs[i].placeholder+' id='+inputs[i].id;" +
+            // ─ بررسی iframe ─
+            "  var frames = document.querySelectorAll('iframe');" +
+            "  Android.onLog('iframes: ' + frames.length);" +
+            // ─ انتخاب document (اصلی یا iframe) ─
+            "  var docs = [document];" +
+            "  for(var f=0;f<frames.length;f++){" +
+            "    try{ if(frames[f].contentDocument) docs.push(frames[f].contentDocument); }catch(e){}" +
             "  }" +
-            "  for(var j=0;j<buttons.length;j++){" +
-            "    info += ' | btn['+j+'] txt='+buttons[j].innerText.trim().substring(0,30)+' type='+buttons[j].type;" +
-            "  }" +
-            "  Android.onLog('صفحه: ' + info);" +
+            "  var filled = false;" +
+            "  for(var d=0;d<docs.length && !filled;d++){" +
+            "    var doc = docs[d];" +
+            "    var inputs  = doc.querySelectorAll('input:not([type=hidden])');" +
+            "    var buttons = doc.querySelectorAll('button,input[type=submit],[role=button],[type=button]');" +
+            "    var info='doc['+d+']: inputs='+inputs.length+' btns='+buttons.length;" +
+            "    for(var i=0;i<inputs.length;i++) info+=' IN['+i+']='+inputs[i].type+'/'+inputs[i].placeholder.substring(0,15);" +
+            "    for(var j=0;j<buttons.length;j++) info+=' BT['+j+']=\"'+buttons[j].innerText.trim().substring(0,20)+'\"';" +
+            "    Android.onLog(info);" +
             // ─ مرحله ۲: پسورد ─
-            "  var passEl = document.querySelector('input[type=password]');" +
-            "  if (passEl) {" +
-            "    setter.call(passEl, '" + PASSWORD + "');" +
-            "    passEl.dispatchEvent(new Event('input',{bubbles:true}));" +
-            "    passEl.dispatchEvent(new Event('change',{bubbles:true}));" +
-            "    Android.onLog('مرحله ۲: پسورد وارد شد');" +
-            "    setTimeout(function() { clickSubmit(); }, 800);" +
-            "    return;" +
-            "  }" +
+            "    var passEl = doc.querySelector('input[type=password]');" +
+            "    if (passEl) {" +
+            "      setter.call(passEl, '" + PASSWORD + "');" +
+            "      passEl.dispatchEvent(new Event('input',{bubbles:true}));" +
+            "      passEl.dispatchEvent(new Event('change',{bubbles:true}));" +
+            "      Android.onLog('مرحله ۲: پسورد وارد شد');" +
+            "      setTimeout(function(){ clickIn(doc); }, 1000);" +
+            "      filled=true; break;" +
+            "    }" +
             // ─ مرحله ۱: ایمیل ─
-            "  var emailEl = inputs[0];" +
-            "  if (!emailEl) { Android.onLog('هیچ input‌ای پیدا نشد'); return; }" +
-            "  setter.call(emailEl, '" + EMAIL + "');" +
-            "  emailEl.dispatchEvent(new Event('input',{bubbles:true}));" +
-            "  emailEl.dispatchEvent(new Event('change',{bubbles:true}));" +
-            "  Android.onLog('مرحله ۱: ایمیل وارد شد');" +
-            "  setTimeout(function() { clickSubmit(); }, 1200);" +
-            // ─ تابع کمکی برای کلیک دکمه ─
-            "  function clickSubmit() {" +
-            "    var btn = document.querySelector('button[type=submit]')" +
-            "           || document.querySelector('input[type=submit]')" +
-            "           || document.querySelector('button.btn')" +
-            "           || document.querySelector('button.submit')" +
-            "           || document.querySelector('button.login-btn')" +
-            "           || document.querySelector('[role=button]')" +
-            "           || document.querySelector('button');" +
-            "    if (btn) {" +
-            "      btn.click();" +
-            "      Android.onLog('دکمه کلیک شد: ' + btn.innerText.trim());" +
-            "    } else {" +
-            // آخرین تلاش: submit فرم مستقیم
-            "      var form = document.querySelector('form');" +
-            "      if (form) { form.submit(); Android.onLog('فرم مستقیم submit شد'); }" +
-            "      else { Android.onLog('نه دکمه نه فرم پیدا نشد'); }" +
+            "    if (inputs.length > 0) {" +
+            "      var el = inputs[0];" +
+            "      setter.call(el, '" + EMAIL + "');" +
+            "      el.dispatchEvent(new Event('focus',{bubbles:true}));" +
+            "      el.dispatchEvent(new Event('input',{bubbles:true}));" +
+            "      el.dispatchEvent(new Event('change',{bubbles:true}));" +
+            "      el.dispatchEvent(new Event('blur',{bubbles:true}));" +
+            "      Android.onLog('مرحله ۱: ایمیل وارد شد در doc['+d+']');" +
+            "      setTimeout(function(){ clickIn(doc); }, 1500);" +
+            "      filled=true; break;" +
             "    }" +
             "  }" +
-            "})();";
+            "  if(!filled && depth<3){" +
+            "    Android.onLog('هنوز آماده نیست، دوباره تلاش در 2 ثانیه...');" +
+            "    setTimeout(function(){ tryFill(depth+1); }, 2000);" +
+            "  }" +
+            "  function clickIn(doc) {" +
+            "    var b = doc.querySelector('button[type=submit]')" +
+            "          ||doc.querySelector('input[type=submit]')" +
+            "          ||doc.querySelector('[role=button]')" +
+            "          ||doc.querySelector('button');" +
+            "    if(b){" +
+            "      b.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));" +
+            "      Android.onLog('کلیک روی: \"'+b.innerText.trim()+'\"');" +
+            "    } else {" +
+            "      var form=doc.querySelector('form');" +
+            "      if(form){ form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})); Android.onLog('form submit'); }" +
+            "      else { Android.onLog('دکمه/فرم پیدا نشد'); }" +
+            "    }" +
+            "  }" +
+            "})(0);";
         webView.evaluateJavascript(js, null);
     }
 
