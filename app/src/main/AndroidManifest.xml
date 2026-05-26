@@ -35,6 +35,11 @@
             android:name=".SmsBotService"
             android:exported="false" />
 
+        <activity
+            android:name=".JobVisionActivity"
+            android:exported="false"
+            android:label="JobVision Bot" />
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">

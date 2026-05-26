@@ -65,6 +65,22 @@ public class MainActivity extends Activity {
         toggleBtn = new Button(this);
         root.addView(toggleBtn);
 
+        Button jobBtn = new Button(this);
+        jobBtn.setText("JobVision - جمع‌آوری شماره و ارسال SMS");
+        jobBtn.setBackgroundColor(Color.parseColor("#1976D2"));
+        jobBtn.setTextColor(Color.WHITE);
+        LinearLayout.LayoutParams jlp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        jlp.setMargins(0, 8, 0, 0);
+        jobBtn.setLayoutParams(jlp);
+        jobBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new android.content.Intent(MainActivity.this, JobVisionActivity.class));
+            }
+        });
+        root.addView(jobBtn);
+
         TextView logLabel = new TextView(this);
         logLabel.setText("لاگ پیام‌ها:");
         logLabel.setTextColor(Color.LTGRAY);
