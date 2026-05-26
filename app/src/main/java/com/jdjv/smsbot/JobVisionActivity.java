@@ -378,27 +378,6 @@ public class JobVisionActivity extends Activity {
             "})();";
         webView.evaluateJavascript(js, null);
     }
-        webView.evaluateJavascript(js, null);
-    }
-
-    private void doLoginStep2() {
-        log("مرحله ۲: وارد کردن پسورد...");
-        String js =
-            "(function() {" +
-            "  var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;" +
-            "  var passEl = document.querySelector('input[type=password]');" +
-            "  if (!passEl) { Android.onLog('فیلد پسورد پیدا نشد'); return; }" +
-            "  setter.call(passEl, '" + PASSWORD + "');" +
-            "  passEl.dispatchEvent(new Event('input',{bubbles:true}));" +
-            "  passEl.dispatchEvent(new Event('change',{bubbles:true}));" +
-            "  Android.onLog('پسورد وارد شد');" +
-            "  setTimeout(function() {" +
-            "    var btn = document.querySelector('button[type=submit]') || document.querySelector('button');" +
-            "    if(btn){ btn.click(); Android.onLog('دکمه ورود کلیک شد'); }" +
-            "  }, 800);" +
-            "})();";
-        webView.evaluateJavascript(js, null);
-    }
 
     // ─── رفتن به لیست درخواست‌ها ─────────────────────────────────────────────
     private void goToApplicants() {
