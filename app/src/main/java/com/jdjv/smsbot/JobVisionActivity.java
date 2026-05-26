@@ -347,18 +347,24 @@ public class JobVisionActivity extends Activity {
             "    setTimeout(function(){ tryFill(depth+1); }, 2000);" +
             "  }" +
             "  function clickIn(doc) {" +
-            "    var b = doc.querySelector('button[type=submit]')" +
-            "          ||doc.querySelector('input[type=submit]')" +
-            "          ||doc.querySelector('[role=button]')" +
-            "          ||doc.querySelector('button');" +
-            "    if(b){" +
-            "      b.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));" +
-            "      Android.onLog('کلیک روی: \"'+b.innerText.trim()+'\"');" +
-            "    } else {" +
-            "      var form=doc.querySelector('form');" +
-            "      if(form){ form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})); Android.onLog('form submit'); }" +
-            "      else { Android.onLog('دکمه/فرم پیدا نشد'); }" +
+            "    var found=false;" +
+            "    var all=doc.querySelectorAll('*');" +
+            "    var targets=['ادامه','ورود','Continue','Login','Sign in','submit','Next'];" +
+            "    for(var k=0;k<all.length&&!found;k++){" +
+            "      var t=(all[k].innerText||'').trim();" +
+            "      for(var m=0;m<targets.length;m++){" +
+            "        if(t===targets[m]){" +
+            "          all[k].click();" +
+            "          Android.onLog('کلیک روی: '+all[k].tagName+' \"'+t+'\"');" +
+            "          found=true;break;" +
+            "        }" +
+            "      }" +
             "    }" +
+            "    if(!found){" +
+            "      var b=doc.querySelector('button,input[type=submit],[role=button],a.btn');" +
+            "      if(b){b.click();Android.onLog('کلیک fallback: '+b.tagName+' \"'+b.innerText.trim()+'\"');found=true;}" +
+            "    }" +
+            "    if(!found) Android.onLog('دکمه پیدا نشد - کل عناصر: '+all.length);" +
             "  }" +
             "})(0);";
         webView.evaluateJavascript(js, null);
