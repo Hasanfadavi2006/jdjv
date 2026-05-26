@@ -43,6 +43,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        CrashHandler.install(this);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -64,6 +65,21 @@ public class MainActivity extends Activity {
 
         toggleBtn = new Button(this);
         root.addView(toggleBtn);
+
+        Button crashBtn = new Button(this);
+        crashBtn.setText("مشاهده لاگ خطا (Crash Log)");
+        crashBtn.setBackgroundColor(Color.parseColor("#B00020"));
+        crashBtn.setTextColor(Color.WHITE);
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        clp.setMargins(0, 4, 0, 0);
+        crashBtn.setLayoutParams(clp);
+        crashBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                startActivity(new android.content.Intent(MainActivity.this, CrashLogActivity.class));
+            }
+        });
+        root.addView(crashBtn);
 
         Button jobBtn = new Button(this);
         jobBtn.setText("JobVision - جمع‌آوری شماره و ارسال SMS");

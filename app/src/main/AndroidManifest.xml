@@ -42,6 +42,11 @@
             android:exported="false"
             android:label="JobVision Bot" />
 
+        <activity
+            android:name=".CrashLogActivity"
+            android:exported="false"
+            android:label="Crash Log" />
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">

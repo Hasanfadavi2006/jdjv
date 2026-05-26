@@ -60,8 +60,15 @@ public class JobVisionActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        buildUI();
-        setupWebView();
+        CrashHandler.install(this);
+        try {
+            buildUI();
+            setupWebView();
+        } catch (Throwable t) {
+            // لاگ دستی اگه حتی buildUI کرش کرد
+            CrashHandler.install(this);
+            throw new RuntimeException("onCreate crash: " + t.getMessage(), t);
+        }
     }
 
     // ─── UI ─────────────────────────────────────────────────────────────────
