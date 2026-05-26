@@ -313,6 +313,16 @@ public class JobVisionActivity extends Activity {
             "    });" +
             "  }" +
 
+            // ─ تابع کلیک واقعی با mousedown/mouseup/click ─
+            "  function realClick(el) {" +
+            "    var rect = el.getBoundingClientRect();" +
+            "    var cx = rect.left + rect.width/2;" +
+            "    var cy = rect.top + rect.height/2;" +
+            "    ['mousedown','mouseup','click'].forEach(function(type){" +
+            "      el.dispatchEvent(new MouseEvent(type,{bubbles:true,cancelable:true,view:window,clientX:cx,clientY:cy}));" +
+            "    });" +
+            "  }" +
+
             // ─ تابع کلیک با متن ─
             "  function clickByText(texts) {" +
             "    var all = document.querySelectorAll('*');" +
@@ -320,7 +330,7 @@ public class JobVisionActivity extends Activity {
             "      var t=(all[k].innerText||'').trim();" +
             "      for(var m=0;m<texts.length;m++){" +
             "        if(t===texts[m]){" +
-            "          all[k].click();" +
+            "          realClick(all[k]);" +
             "          Android.onLog('کلیک: '+all[k].tagName+' \"'+t+'\"');" +
             "          return true;" +
             "        }" +
@@ -354,7 +364,10 @@ public class JobVisionActivity extends Activity {
             "        clearInterval(interval);" +
             "        Android.onLog('فیلد پسورد ظاهر شد');" +
             "        step2(passEl);" +
-            "      } else if(tries > 20){" +
+            "      } else if(tries === 6){" +
+            "        Android.onLog('تلاش مجدد کلیک ادامه...');" +
+            "        clickByText(['ادامه','Continue','Next','بعدی']);" +
+            "      } else if(tries > 30){" +
             "        clearInterval(interval);" +
             "        Android.onLog('پسورد ظاهر نشد - URL: '+location.href);" +
             "      }" +
