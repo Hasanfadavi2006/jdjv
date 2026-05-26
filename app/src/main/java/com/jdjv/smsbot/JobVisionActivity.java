@@ -200,11 +200,40 @@ public class JobVisionActivity extends Activity {
         webView.loadUrl(LOGIN_URL);
     }
 
+    // ─── اسکن محتوای صفحه و لاگ کردن ─────────────────────────────────────────
+    private void logPageContent() {
+        String js =
+            "(function() {" +
+            "  var out = [];" +
+            "  out.push('─── محتوای صفحه ───');" +
+            "  out.push('عنوان: ' + document.title);" +
+            "  out.push('URL: ' + location.href);" +
+            // هدینگ‌ها
+            "  var hs = document.querySelectorAll('h1,h2,h3');" +
+            "  for(var i=0;i<Math.min(hs.length,5);i++) out.push('H: '+hs[i].innerText.trim().substring(0,60));" +
+            // inputها
+            "  var ins = document.querySelectorAll('input:not([type=hidden])');" +
+            "  for(var i=0;i<ins.length;i++) out.push('INPUT['+i+']: type='+ins[i].type+' ph=\"'+ins[i].placeholder+'\" id='+ins[i].id);" +
+            // دکمه‌ها
+            "  var btns = document.querySelectorAll('button,input[type=submit],[role=button]');" +
+            "  for(var i=0;i<Math.min(btns.length,8);i++) out.push('BTN['+i+']: \"'+btns[i].innerText.trim().substring(0,40)+'\" type='+btns[i].getAttribute('type'));" +
+            // لینک‌های مهم
+            "  var links = document.querySelectorAll('a[href]');" +
+            "  var linkCount=0;" +
+            "  for(var i=0;i<links.length && linkCount<5;i++){" +
+            "    var h=links[i].href;" +
+            "    if(h.indexOf('jobvision')!==-1){out.push('LINK: '+h.substring(0,80));linkCount++;}" +
+            "  }" +
+            "  out.push('─────────────────');" +
+            "  Android.onLog(out.join('\\n'));" +
+            "})();";
+        webView.evaluateJavascript(js, null);
+    }
+
     // ─── مدیریت صفحات ────────────────────────────────────────────────────────
     private void handlePage(String url) {
+        logPageContent();
         if (url.contains("account.jobvision.ir") && state == STATE_LOGIN) {
-            // هر بار که صفحه account لود شد doLogin صدا بزن
-            // (مرحله ۱: ایمیل - مرحله ۲: پسورد - هر دو با همین تابع کنترل می‌شن)
             doLogin();
 
         } else if (url.contains("employer.jobvision.ir") && state == STATE_LOGIN) {
@@ -231,41 +260,59 @@ public class JobVisionActivity extends Activity {
     // ─── لاگین (دو مرحله‌ای: اول ایمیل، بعد پسورد) ──────────────────────────
     private void doLogin() {
         log("بررسی فرم لاگین...");
-        // جاب‌ویژن دو مرحله دارد: ابتدا فقط ایمیل، سپس پسورد
-        // بررسی می‌کنیم الان کدام مرحله هستیم
         String js =
             "(function() {" +
+            // ─ تشخیص صفحه ─
             "  var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;" +
-            "  var inputs = document.querySelectorAll('input:not([type=hidden])');" +
-            "  Android.onLog('تعداد inputs: ' + inputs.length);" +
-            // اگه پسورد وجود داشت: مرحله دوم
+            "  var inputs  = document.querySelectorAll('input:not([type=hidden])');" +
+            "  var buttons = document.querySelectorAll('button,input[type=submit],[role=button]');" +
+            "  var info = 'inputs:' + inputs.length + ' buttons:' + buttons.length;" +
+            "  for(var i=0;i<inputs.length;i++){" +
+            "    info += ' | input['+i+'] type='+inputs[i].type+' ph='+inputs[i].placeholder+' id='+inputs[i].id;" +
+            "  }" +
+            "  for(var j=0;j<buttons.length;j++){" +
+            "    info += ' | btn['+j+'] txt='+buttons[j].innerText.trim().substring(0,30)+' type='+buttons[j].type;" +
+            "  }" +
+            "  Android.onLog('صفحه: ' + info);" +
+            // ─ مرحله ۲: پسورد ─
             "  var passEl = document.querySelector('input[type=password]');" +
             "  if (passEl) {" +
             "    setter.call(passEl, '" + PASSWORD + "');" +
             "    passEl.dispatchEvent(new Event('input',{bubbles:true}));" +
             "    passEl.dispatchEvent(new Event('change',{bubbles:true}));" +
             "    Android.onLog('مرحله ۲: پسورد وارد شد');" +
-            "    setTimeout(function() {" +
-            "      var btn = document.querySelector('button[type=submit]') || document.querySelector('button');" +
-            "      if(btn){ btn.click(); Android.onLog('دکمه ورود کلیک شد'); }" +
-            "    }, 800);" +
+            "    setTimeout(function() { clickSubmit(); }, 800);" +
             "    return;" +
             "  }" +
-            // مرحله اول: فقط ایمیل
+            // ─ مرحله ۱: ایمیل ─
             "  var emailEl = inputs[0];" +
             "  if (!emailEl) { Android.onLog('هیچ input‌ای پیدا نشد'); return; }" +
             "  setter.call(emailEl, '" + EMAIL + "');" +
             "  emailEl.dispatchEvent(new Event('input',{bubbles:true}));" +
             "  emailEl.dispatchEvent(new Event('change',{bubbles:true}));" +
             "  Android.onLog('مرحله ۱: ایمیل وارد شد');" +
-            "  setTimeout(function() {" +
-            "    var btn = document.querySelector('button[type=submit]') || document.querySelector('button');" +
-            "    if(btn){ btn.click(); Android.onLog('دکمه بعدی کلیک شد'); }" +
-            "    else { Android.onLog('دکمه پیدا نشد'); }" +
-            "  }, 800);" +
+            "  setTimeout(function() { clickSubmit(); }, 1200);" +
+            // ─ تابع کمکی برای کلیک دکمه ─
+            "  function clickSubmit() {" +
+            "    var btn = document.querySelector('button[type=submit]')" +
+            "           || document.querySelector('input[type=submit]')" +
+            "           || document.querySelector('button.btn')" +
+            "           || document.querySelector('button.submit')" +
+            "           || document.querySelector('button.login-btn')" +
+            "           || document.querySelector('[role=button]')" +
+            "           || document.querySelector('button');" +
+            "    if (btn) {" +
+            "      btn.click();" +
+            "      Android.onLog('دکمه کلیک شد: ' + btn.innerText.trim());" +
+            "    } else {" +
+            // آخرین تلاش: submit فرم مستقیم
+            "      var form = document.querySelector('form');" +
+            "      if (form) { form.submit(); Android.onLog('فرم مستقیم submit شد'); }" +
+            "      else { Android.onLog('نه دکمه نه فرم پیدا نشد'); }" +
+            "    }" +
+            "  }" +
             "})();";
         webView.evaluateJavascript(js, null);
-        // state رو STATE_LOGIN نگه می‌داریم تا مرحله دوم هم اجرا بشه
     }
 
     private void doLoginStep2() {
