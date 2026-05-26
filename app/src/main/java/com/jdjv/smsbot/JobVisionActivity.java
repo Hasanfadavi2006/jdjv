@@ -295,78 +295,89 @@ public class JobVisionActivity extends Activity {
         }
     }
 
-    // ─── لاگین (دو مرحله‌ای) ──────────────────────────────────────────────────
+    // ─── لاگین کامل با MutationObserver ─────────────────────────────────────
     private void doLogin() {
-        log("بررسی فرم لاگین...");
+        log("شروع اتوماسیون لاگین...");
         String js =
-            "(function tryFill(depth) {" +
-            "  if(depth===undefined) depth=0;" +
+            "(function() {" +
+            "  if(window._botRunning) return;" +
+            "  window._botRunning = true;" +
             "  var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;" +
-            // ─ بررسی iframe ─
-            "  var frames = document.querySelectorAll('iframe');" +
-            "  Android.onLog('iframes: ' + frames.length);" +
-            // ─ انتخاب document (اصلی یا iframe) ─
-            "  var docs = [document];" +
-            "  for(var f=0;f<frames.length;f++){" +
-            "    try{ if(frames[f].contentDocument) docs.push(frames[f].contentDocument); }catch(e){}" +
+
+            // ─ تابع پر کردن input با React events ─
+            "  function fillInput(el, val) {" +
+            "    el.focus();" +
+            "    setter.call(el, val);" +
+            "    ['input','change','blur'].forEach(function(e){" +
+            "      el.dispatchEvent(new Event(e,{bubbles:true,cancelable:true}));" +
+            "    });" +
             "  }" +
-            "  var filled = false;" +
-            "  for(var d=0;d<docs.length && !filled;d++){" +
-            "    var doc = docs[d];" +
-            "    var inputs  = doc.querySelectorAll('input:not([type=hidden])');" +
-            "    var buttons = doc.querySelectorAll('button,input[type=submit],[role=button],[type=button]');" +
-            "    var info='doc['+d+']: inputs='+inputs.length+' btns='+buttons.length;" +
-            "    for(var i=0;i<inputs.length;i++) info+=' IN['+i+']='+inputs[i].type+'/'+inputs[i].placeholder.substring(0,15);" +
-            "    for(var j=0;j<buttons.length;j++) info+=' BT['+j+']=\"'+buttons[j].innerText.trim().substring(0,20)+'\"';" +
-            "    Android.onLog(info);" +
-            // ─ مرحله ۲: پسورد ─
-            "    var passEl = doc.querySelector('input[type=password]');" +
-            "    if (passEl) {" +
-            "      setter.call(passEl, '" + PASSWORD + "');" +
-            "      passEl.dispatchEvent(new Event('input',{bubbles:true}));" +
-            "      passEl.dispatchEvent(new Event('change',{bubbles:true}));" +
-            "      Android.onLog('مرحله ۲: پسورد وارد شد');" +
-            "      setTimeout(function(){ clickIn(doc); }, 1000);" +
-            "      filled=true; break;" +
-            "    }" +
-            // ─ مرحله ۱: ایمیل ─
-            "    if (inputs.length > 0) {" +
-            "      var el = inputs[0];" +
-            "      setter.call(el, '" + EMAIL + "');" +
-            "      el.dispatchEvent(new Event('focus',{bubbles:true}));" +
-            "      el.dispatchEvent(new Event('input',{bubbles:true}));" +
-            "      el.dispatchEvent(new Event('change',{bubbles:true}));" +
-            "      el.dispatchEvent(new Event('blur',{bubbles:true}));" +
-            "      Android.onLog('مرحله ۱: ایمیل وارد شد در doc['+d+']');" +
-            "      setTimeout(function(){ clickIn(doc); }, 1500);" +
-            "      filled=true; break;" +
-            "    }" +
-            "  }" +
-            "  if(!filled && depth<3){" +
-            "    Android.onLog('هنوز آماده نیست، دوباره تلاش در 2 ثانیه...');" +
-            "    setTimeout(function(){ tryFill(depth+1); }, 2000);" +
-            "  }" +
-            "  function clickIn(doc) {" +
-            "    var found=false;" +
-            "    var all=doc.querySelectorAll('*');" +
-            "    var targets=['ادامه','ورود','Continue','Login','Sign in','submit','Next'];" +
-            "    for(var k=0;k<all.length&&!found;k++){" +
+
+            // ─ تابع کلیک با متن ─
+            "  function clickByText(texts) {" +
+            "    var all = document.querySelectorAll('*');" +
+            "    for(var k=0;k<all.length;k++){" +
             "      var t=(all[k].innerText||'').trim();" +
-            "      for(var m=0;m<targets.length;m++){" +
-            "        if(t===targets[m]){" +
+            "      for(var m=0;m<texts.length;m++){" +
+            "        if(t===texts[m]){" +
             "          all[k].click();" +
-            "          Android.onLog('کلیک روی: '+all[k].tagName+' \"'+t+'\"');" +
-            "          found=true;break;" +
+            "          Android.onLog('کلیک: '+all[k].tagName+' \"'+t+'\"');" +
+            "          return true;" +
             "        }" +
             "      }" +
             "    }" +
-            "    if(!found){" +
-            "      var b=doc.querySelector('button,input[type=submit],[role=button],a.btn');" +
-            "      if(b){b.click();Android.onLog('کلیک fallback: '+b.tagName+' \"'+b.innerText.trim()+'\"');found=true;}" +
-            "    }" +
-            "    if(!found) Android.onLog('دکمه پیدا نشد - کل عناصر: '+all.length);" +
+            "    return false;" +
             "  }" +
-            "})(0);";
+
+            // ─ مرحله ۱: پر کردن ایمیل ─
+            "  function step1() {" +
+            "    var inputs = document.querySelectorAll('input:not([type=hidden]):not([type=checkbox])');" +
+            "    Android.onLog('step1: inputs=' + inputs.length);" +
+            "    if(inputs.length === 0){ setTimeout(step1, 1500); return; }" +
+            "    fillInput(inputs[0], '" + EMAIL + "');" +
+            "    Android.onLog('ایمیل وارد شد');" +
+            // بعد از کلیک ادامه، منتظر بشو تا فیلد پسورد ظاهر بشه
+            "    setTimeout(function(){" +
+            "      clickByText(['ادامه','Continue','Next','بعدی']);" +
+            "      watchForPassword();" +
+            "    }, 1500);" +
+            "  }" +
+
+            // ─ مرحله ۲: منتظر ظاهر شدن پسورد (MutationObserver) ─
+            "  function watchForPassword() {" +
+            "    Android.onLog('منتظر فیلد پسورد...');" +
+            "    var tries = 0;" +
+            "    var interval = setInterval(function(){" +
+            "      tries++;" +
+            "      var passEl = document.querySelector('input[type=password]');" +
+            "      if(passEl){" +
+            "        clearInterval(interval);" +
+            "        Android.onLog('فیلد پسورد ظاهر شد');" +
+            "        step2(passEl);" +
+            "      } else if(tries > 20){" +
+            "        clearInterval(interval);" +
+            "        Android.onLog('پسورد ظاهر نشد - URL: '+location.href);" +
+            "      }" +
+            "    }, 500);" +  // هر ۵۰۰ms چک کن
+            "  }" +
+
+            // ─ مرحله ۲: پر کردن پسورد ─
+            "  function step2(passEl) {" +
+            "    fillInput(passEl, '" + PASSWORD + "');" +
+            "    Android.onLog('پسورد وارد شد');" +
+            "    setTimeout(function(){" +
+            "      if(!clickByText(['ورود','Login','Sign in','تایید','وارد شوید'])){" +
+            "        var b=document.querySelector('button,input[type=submit]');" +
+            "        if(b){b.click();Android.onLog('کلیک fallback: '+b.innerText);}" +
+            "        else Android.onLog('دکمه ورود پیدا نشد');" +
+            "      }" +
+            "    }, 1000);" +
+            "  }" +
+
+            "  step1();" +
+            "})();";
+        webView.evaluateJavascript(js, null);
+    }
         webView.evaluateJavascript(js, null);
     }
 
