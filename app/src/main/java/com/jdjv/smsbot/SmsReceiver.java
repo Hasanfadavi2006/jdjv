@@ -13,11 +13,10 @@ public class SmsReceiver extends BroadcastReceiver {
 
     private static final String TAG = "SmsBat";
     private static final String SMS_RECEIVED = "android.provider.Telephony.SMS_RECEIVED";
-    // هر پیام بات با این شروع می‌شه تا حلقه تشخیص داده بشه
-    private static final String BOT_STAMP = "​"; // zero-width space نامرئی
+    private static final String BOT_STAMP = "​"; // zero-width space — جلوگیری از حلقه
 
     @Override
-    public void onReceive(Context context, Intent intent) {
+    public void onReceive(final Context context, Intent intent) {
         if (!SMS_RECEIVED.equals(intent.getAction())) return;
 
         SharedPreferences prefs = context.getSharedPreferences("smsbot", Context.MODE_PRIVATE);
@@ -35,44 +34,58 @@ public class SmsReceiver extends BroadcastReceiver {
             body.append(msg.getMessageBody());
         }
 
-        String text = body.toString();
+        final String text = body.toString();
+        final String from = sender;
 
-        // اگه پیام از خود بات بود (شامل zero-width space) → حلقه رو متوقف کن
-        if (text.contains(BOT_STAMP)) {
-            Log.d(TAG, "پیام بات تشخیص داده شد، جواب نمی‌ده");
-            return;
-        }
+        // پیام خود بات (zero-width space) → نادیده بگیر
+        if (text.contains(BOT_STAMP)) return;
 
-        // اگه پیام در ۳ ثانیه گذشته ارسال شده بود → جلوگیری از حلقه
+        // پیام تکراری در ۳ ثانیه → نادیده بگیر
         long lastSent = prefs.getLong("last_sent_time", 0);
         String lastReply = prefs.getString("last_sent_text", "");
-        if (System.currentTimeMillis() - lastSent < 3000 && text.equals(lastReply)) {
-            Log.d(TAG, "پیام تکراری اخیر، جواب نمی‌ده");
-            return;
-        }
+        if (System.currentTimeMillis() - lastSent < 3000 && text.equals(lastReply)) return;
 
-        Log.d(TAG, "پیام از " + sender + ": " + text);
-        SmsLogger.save(context, sender, text, true);
+        Log.d(TAG, "پیام از " + from + ": " + text);
+        SmsLogger.save(context, from, text, true);
+        context.sendBroadcast(new Intent("com.jdjv.smsbot.NEW_MESSAGE"));
 
-        // جواب بات + کاراکتر نامرئی برای شناسایی
-        String reply = BOT_STAMP + BotRules.getReply(text);
+        // ─ Claude API رو async صدا بزن ─
+        final PendingResult pending = goAsync();
+        ClaudeApiClient.getReply(context, from, text, new ClaudeApiClient.Callback() {
+            @Override
+            public void onReply(String reply) {
+                sendReply(context, from, reply, text);
+                pending.finish();
+            }
+            @Override
+            public void onError(String error) {
+                Log.e(TAG, "Claude خطا: " + error);
+                // fallback به قانون‌های ساده
+                String reply = BotRules.getReply(text);
+                sendReply(context, from, reply, text);
+                pending.finish();
+            }
+        });
+    }
+
+    private void sendReply(Context context, String to, String reply, String originalText) {
+        String stamped = BOT_STAMP + reply;
         try {
             SmsManager sm = SmsManager.getDefault();
-            ArrayList<String> parts = sm.divideMessage(reply);
-            sm.sendMultipartTextMessage(sender, null, parts, null, null);
+            ArrayList<String> parts = sm.divideMessage(stamped);
+            sm.sendMultipartTextMessage(to, null, parts, null, null);
 
-            // ذخیره زمان و متن آخرین ارسال
+            SharedPreferences prefs = context.getSharedPreferences("smsbot", Context.MODE_PRIVATE);
             prefs.edit()
                 .putLong("last_sent_time", System.currentTimeMillis())
-                .putString("last_sent_text", text)
+                .putString("last_sent_text", originalText)
                 .apply();
 
-            SmsLogger.save(context, sender, reply.substring(1), false); // بدون stamp ذخیره کن
-            Log.d(TAG, "جواب ارسال شد: " + reply);
+            SmsLogger.save(context, to, reply, false);
+            Log.d(TAG, "جواب Claude ارسال شد به " + to + ": " + reply);
+            context.sendBroadcast(new Intent("com.jdjv.smsbot.NEW_MESSAGE"));
         } catch (Exception e) {
             Log.e(TAG, "خطا در ارسال: " + e.getMessage());
         }
-
-        context.sendBroadcast(new Intent("com.jdjv.smsbot.NEW_MESSAGE"));
     }
 }
