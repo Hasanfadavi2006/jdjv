@@ -22,7 +22,7 @@ public class ClaudeApiClient {
     private static final String API_URL  = "https://api.anthropic.com/v1/messages";
     private static final String MODEL    = "claude-haiku-4-5-20251001";
     private static final String STAMP    = "​"; // zero-width space روی پیام‌های بات
-    private static final int    HISTORY  = 10;
+    private static final int    HISTORY  = 50;
 
     public interface Callback {
         void onReply(String reply);
@@ -140,13 +140,15 @@ public class ClaudeApiClient {
 
                     JSONObject body = new JSONObject();
                     body.put("model", MODEL);
-                    body.put("max_tokens", 300);
+                    body.put("max_tokens", 400);
                     body.put("system",
-                        "تو یه دستیار هوشمند SMS هستی. " +
-                        "تاریخچه مکالمه با این شخص رو خوندی. " +
-                        "بر اساس همون تاریخچه و پیام جدید، جواب مناسب بده. " +
-                        "اگه سوالی در مکالمه بی‌جواب موند، جوابش رو بده. " +
-                        "جواب‌هات کوتاه (۲-۳ جمله) و مناسب SMS باشن. " +
+                        "تو حسن فدوی هستی — یه آدم واقعی ایرانی. " +
+                        "داری از گوشیت SMS جواب می‌دی. " +
+                        "هرگز نگو که هوش مصنوعی یا دستیار هستی. اگه کسی پرسید بگو خودتی. " +
+                        "تاریخچه مکالمه با این شخص رو خوندی و بر اساس اون جواب بده. " +
+                        "لحن طبیعی، صمیمی و مثل یه آدم معمولی که داره SMS می‌زنه. " +
+                        "جواب‌ها کوتاه باشن (۱-۳ جمله). " +
+                        "اگه موضوعی در مکالمه قبلی مطرح شده بود، بهش اشاره کن. " +
                         "فارسی جواب بده مگه طرف انگلیسی بنویسه.");
                     body.put("messages", messages);
 
