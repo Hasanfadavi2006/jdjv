@@ -313,28 +313,35 @@ public class JobVisionActivity extends Activity {
             "    });" +
             "  }" +
 
-            // ─ تابع کلیک واقعی با mousedown/mouseup/click ─
-            "  function realClick(el) {" +
-            "    var rect = el.getBoundingClientRect();" +
-            "    var cx = rect.left + rect.width/2;" +
-            "    var cy = rect.top + rect.height/2;" +
-            "    ['mousedown','mouseup','click'].forEach(function(type){" +
-            "      el.dispatchEvent(new MouseEvent(type,{bubbles:true,cancelable:true,view:window,clientX:cx,clientY:cy}));" +
-            "    });" +
+            // ─ tap واقعی Android از طریق JavascriptInterface ─
+            "  function tapElement(el) {" +
+            "    el.scrollIntoView({block:'center'});" +
+            "    setTimeout(function(){" +
+            "      var rect = el.getBoundingClientRect();" +
+            "      var x = rect.left + rect.width/2;" +
+            "      var y = rect.top + rect.height/2;" +
+            "      Android.tapAt(x, y);" +
+            "    }, 300);" +
             "  }" +
 
-            // ─ تابع کلیک با متن ─
+            // ─ پیدا کردن عنصر با متن و tap کردن ─
             "  function clickByText(texts) {" +
-            "    var all = document.querySelectorAll('*');" +
+            "    var best = null;" +
+            "    var all = document.querySelectorAll('button,[role=button],a,div,span');" +
             "    for(var k=0;k<all.length;k++){" +
             "      var t=(all[k].innerText||'').trim();" +
             "      for(var m=0;m<texts.length;m++){" +
             "        if(t===texts[m]){" +
-            "          realClick(all[k]);" +
-            "          Android.onLog('کلیک: '+all[k].tagName+' \"'+t+'\"');" +
-            "          return true;" +
+            "          var r=all[k].getBoundingClientRect();" +
+            "          if(r.width>0 && r.height>0){ best=all[k]; break; }" +
             "        }" +
             "      }" +
+            "      if(best) break;" +
+            "    }" +
+            "    if(best){" +
+            "      Android.onLog('tap: '+best.tagName+' \"'+(best.innerText||'').trim()+'\"');" +
+            "      tapElement(best);" +
+            "      return true;" +
             "    }" +
             "    return false;" +
             "  }" +
@@ -381,7 +388,7 @@ public class JobVisionActivity extends Activity {
             "    setTimeout(function(){" +
             "      if(!clickByText(['ورود','Login','Sign in','تایید','وارد شوید'])){" +
             "        var b=document.querySelector('button,input[type=submit]');" +
-            "        if(b){b.click();Android.onLog('کلیک fallback: '+b.innerText);}" +
+            "        if(b){tapElement(b);Android.onLog('tap fallback: '+b.innerText);}" +
             "        else Android.onLog('دکمه ورود پیدا نشد');" +
             "      }" +
             "    }, 1000);" +
@@ -581,6 +588,8 @@ public class JobVisionActivity extends Activity {
             }
         }, delay + 500);
     }
+
+    public WebView getWebView() { return webView; }
 
     // ─── لاگ ─────────────────────────────────────────────────────────────────
     public void appendLog(final String msg) { log(msg); }
