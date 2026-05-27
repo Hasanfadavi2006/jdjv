@@ -97,6 +97,21 @@ public class MainActivity extends Activity {
         });
         root.addView(jobBtn);
 
+        Button claudeLogBtn = new Button(this);
+        claudeLogBtn.setText("لاگ Claude API");
+        claudeLogBtn.setBackgroundColor(Color.parseColor("#E65100"));
+        claudeLogBtn.setTextColor(Color.WHITE);
+        LinearLayout.LayoutParams clp2 = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        clp2.setMargins(0, 4, 0, 0);
+        claudeLogBtn.setLayoutParams(clp2);
+        claudeLogBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                showClaudeLog();
+            }
+        });
+        root.addView(claudeLogBtn);
+
         TextView logLabel = new TextView(this);
         logLabel.setText("لاگ پیام‌ها:");
         logLabel.setTextColor(Color.LTGRAY);
@@ -157,6 +172,39 @@ public class MainActivity extends Activity {
             logs.add("[" + e.time + "] " + dir + "\n" + e.text);
         }
         adapter.notifyDataSetChanged();
+    }
+
+    private void showClaudeLog() {
+        String log = ApiLogger.read(this);
+        android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(this);
+        b.setTitle("لاگ Claude API");
+
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.setPadding(16, 8, 16, 8);
+        final TextView tv = new TextView(this);
+        tv.setTextColor(Color.parseColor("#00E5FF"));
+        tv.setTextSize(9);
+        tv.setTypeface(android.graphics.Typeface.MONOSPACE);
+        tv.setText(log.isEmpty() ? "لاگی موجود نیست." : log);
+        sv.addView(tv);
+
+        b.setView(sv);
+        b.setPositiveButton("کپی", new android.content.DialogInterface.OnClickListener() {
+            @Override public void onClick(android.content.DialogInterface d, int w) {
+                android.content.ClipboardManager cm =
+                    (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("log", tv.getText()));
+                Toast.makeText(MainActivity.this, "کپی شد", Toast.LENGTH_SHORT).show();
+            }
+        });
+        b.setNegativeButton("پاک کردن", new android.content.DialogInterface.OnClickListener() {
+            @Override public void onClick(android.content.DialogInterface d, int w) {
+                ApiLogger.clear(MainActivity.this);
+                Toast.makeText(MainActivity.this, "لاگ پاک شد", Toast.LENGTH_SHORT).show();
+            }
+        });
+        b.setNeutralButton("بستن", null);
+        b.show();
     }
 
     private void checkPermissions() {

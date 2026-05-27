@@ -46,6 +46,7 @@ public class SmsReceiver extends BroadcastReceiver {
         if (System.currentTimeMillis() - lastSent < 3000 && text.equals(lastReply)) return;
 
         Log.d(TAG, "پیام از " + from + ": " + text);
+        ApiLogger.log(context, "SMS", "دریافت از " + from + ": " + text);
         SmsLogger.save(context, from, text, true);
         context.sendBroadcast(new Intent("com.jdjv.smsbot.NEW_MESSAGE"));
 
@@ -54,13 +55,14 @@ public class SmsReceiver extends BroadcastReceiver {
         ClaudeApiClient.getReply(context, from, text, new ClaudeApiClient.Callback() {
             @Override
             public void onReply(String reply) {
+                ApiLogger.log(context, "OK", "جواب ارسال به " + from + ": " + reply);
                 sendReply(context, from, reply, text);
                 pending.finish();
             }
             @Override
             public void onError(String error) {
                 Log.e(TAG, "Claude خطا: " + error);
-                // fallback به قانون‌های ساده
+                ApiLogger.log(context, "FALLBACK", "fallback به BotRules — خطا: " + error);
                 String reply = BotRules.getReply(text);
                 sendReply(context, from, reply, text);
                 pending.finish();

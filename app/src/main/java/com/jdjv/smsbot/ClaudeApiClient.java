@@ -30,23 +30,24 @@ public class ClaudeApiClient {
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
+                    ApiLogger.log(ctx, "IN", "از " + sender + ": " + newMessage);
+
                     // ─ گرفتن تاریخچه این شماره (ترتیب زمانی)
                     List<SmsLogger.Entry> all = SmsLogger.load(ctx);
                     List<SmsLogger.Entry> hist = new ArrayList<>();
-                    // load() برعکس برمی‌گردونه، پس برعکس می‌چرخیم
                     for (int i = all.size() - 1; i >= 0; i--) {
                         if (all.get(i).sender.equals(sender)) hist.add(all.get(i));
                     }
-                    // آخرین HISTORY تا
                     int start = Math.max(0, hist.size() - HISTORY);
                     List<SmsLogger.Entry> window = hist.subList(start, hist.size());
+                    ApiLogger.log(ctx, "HIST", "تاریخچه: " + window.size() + " پیام از " + sender);
 
                     // ─ ساخت آرایه messages با چک alternating
                     JSONArray messages = new JSONArray();
                     String lastRole = null;
                     for (SmsLogger.Entry e : window) {
                         String role = e.incoming ? "user" : "assistant";
-                        if (role.equals(lastRole)) continue; // از تکراری شدن جلوگیری
+                        if (role.equals(lastRole)) continue;
                         JSONObject m = new JSONObject();
                         m.put("role", role);
                         m.put("content", e.text);
@@ -62,7 +63,7 @@ public class ClaudeApiClient {
                         messages.put(cur);
                     }
 
-                    // اگه messages خالی یا اولی assistant بود، مطمئن می‌شیم user اول باشه
+                    // اگه خالی یا اولی assistant بود
                     if (messages.length() == 0 ||
                         !"user".equals(messages.getJSONObject(0).getString("role"))) {
                         JSONArray fixed = new JSONArray();
@@ -72,6 +73,8 @@ public class ClaudeApiClient {
                         fixed.put(cur);
                         messages = fixed;
                     }
+
+                    ApiLogger.log(ctx, "REQ", "ارسال به Claude — " + messages.length() + " پیام در context");
 
                     // ─ ساخت body
                     JSONObject body = new JSONObject();
@@ -101,6 +104,8 @@ public class ClaudeApiClient {
                     os.close();
 
                     int code = conn.getResponseCode();
+                    ApiLogger.log(ctx, "HTTP", "status code: " + code);
+
                     InputStream is = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
                     BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
                     StringBuilder sb = new StringBuilder();
@@ -114,14 +119,17 @@ public class ClaudeApiClient {
                                           .getJSONObject(0)
                                           .getString("text")
                                           .trim();
+                        ApiLogger.log(ctx, "REPLY", "جواب Claude: " + reply);
                         cb.onReply(reply);
                     } else {
                         String err = sb.toString();
-                        if (err.length() > 120) err = err.substring(0, 120);
+                        if (err.length() > 200) err = err.substring(0, 200);
+                        ApiLogger.log(ctx, "ERR", "API خطا " + code + ": " + err);
                         cb.onError("API " + code + ": " + err);
                     }
 
                 } catch (Exception e) {
+                    ApiLogger.log(ctx, "EXC", e.getClass().getSimpleName() + ": " + e.getMessage());
                     cb.onError("خطا: " + e.getMessage());
                 }
             }
