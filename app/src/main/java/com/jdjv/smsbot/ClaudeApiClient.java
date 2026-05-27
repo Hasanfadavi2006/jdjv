@@ -20,7 +20,7 @@ public class ClaudeApiClient {
         .append("IVs4btio6NYiWqmlRxD_CPD1YD1g-rhQJgAAA")
         .toString();
     private static final String API_URL  = "https://api.anthropic.com/v1/messages";
-    private static final String MODEL    = "claude-haiku-4-5-20251001";
+    private static final String MODEL    = "claude-sonnet-4-6";
     private static final String STAMP    = "​"; // zero-width space روی پیام‌های بات
     private static final int    HISTORY  = 50;
 
