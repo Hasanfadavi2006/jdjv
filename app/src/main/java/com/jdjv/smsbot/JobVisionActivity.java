@@ -276,26 +276,54 @@ public class JobVisionActivity extends Activity {
 
         } else if (state == STATE_LOGIN &&
                    (url.contains("employer.jobvision.ir") || url.startsWith("https://jobvision.ir"))) {
-            // لاگین موفق — حتی اگه به jobvision.ir ریدایرکت شد
             state = STATE_DASHBOARD;
             log("لاگین موفق! رفتن به لیست آگهی‌ها...");
             handler.postDelayed(new Runnable() {
-                @Override public void run() {
-                    webView.loadUrl(PANEL_URL + "/jobs");
-                }
+                @Override public void run() { webView.loadUrl(PANEL_URL + "/jobs"); }
             }, 1500);
 
-        } else if (state == STATE_APPLICANTS && url.contains("employer.jobvision.ir/jobs")) {
-            // روی صفحه آگهی‌ها هستیم — لینک‌ها رو استخراج کن
+        } else if (state == STATE_DASHBOARD && url.contains("employer.jobvision.ir/jobs")) {
+            // صفحه لیست آگهی‌ها — کلیک روی اولین "مدیریت رزومه ها"
+            state = STATE_APPLICANTS;
+            handler.postDelayed(new Runnable() {
+                @Override public void run() { clickFirstJobBtn(); }
+            }, 2500);
+
+        } else if (state == STATE_APPLICANTS && url.contains("employer.jobvision.ir")) {
+            // صفحه متقاضیان یک آگهی مشخص
+            log("صفحه متقاضیان: " + url);
             state = STATE_RESUME;
             handler.postDelayed(new Runnable() {
                 @Override public void run() { extractApplicantLinks(); }
             }, 2500);
 
         } else if (state == STATE_RESUME && url.contains("employer.jobvision.ir") &&
-                   !url.equals(PANEL_URL + "/jobs") && !url.equals(PANEL_URL + "/")) {
+                   !url.contains("/jobs") && !url.equals(PANEL_URL + "/")) {
             extractResume(url);
         }
+    }
+
+    // ─── کلیک روی اولین "مدیریت رزومه ها" ──────────────────────────────────
+    private void clickFirstJobBtn() {
+        log("کلیک روی مدیریت رزومه ها...");
+        String js =
+            "(function(){" +
+            "  var all=document.querySelectorAll('*');" +
+            "  for(var k=0;k<all.length;k++){" +
+            "    var t=(all[k].innerText||'').trim();" +
+            "    if(t==='مدیریت رزومه ها'){" +
+            "      var r=all[k].getBoundingClientRect();" +
+            "      if(r.width>10&&r.height>10){" +
+            "        var dpr=window.devicePixelRatio||1;" +
+            "        Android.onLog('tap مدیریت رزومه ها: ('+Math.round((r.left+r.width/2)*dpr)+','+Math.round((r.top+r.height/2)*dpr)+')');" +
+            "        Android.tapAt((r.left+r.width/2)*dpr,(r.top+r.height/2)*dpr);" +
+            "        return;" +
+            "      }" +
+            "    }" +
+            "  }" +
+            "  Android.onLog('دکمه مدیریت رزومه ها پیدا نشد');" +
+            "})();";
+        webView.evaluateJavascript(js, null);
     }
 
     // ─── لاگین کامل با MutationObserver ─────────────────────────────────────
@@ -404,12 +432,8 @@ public class JobVisionActivity extends Activity {
         webView.evaluateJavascript(js, null);
     }
 
-    // ─── رفتن به لیست آگهی‌ها ─────────────────────────────────────────────
-    private void goToApplicants() {
-        state = STATE_APPLICANTS;
-        log("رفتن به لیست آگهی‌های کارفرما...");
-        webView.loadUrl(PANEL_URL + "/jobs");
-    }
+    // این متد دیگه استفاده نمی‌شه — لاگین مستقیم /jobs رو لود می‌کنه
+    private void goToApplicants() { webView.loadUrl(PANEL_URL + "/jobs"); }
 
     // ─── استخراج لینک آگهی‌ها از صفحه /jobs ──────────────────────────────────
     private void extractApplicantLinks() {
