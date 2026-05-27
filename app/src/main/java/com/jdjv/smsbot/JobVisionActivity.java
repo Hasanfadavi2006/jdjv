@@ -318,8 +318,10 @@ public class JobVisionActivity extends Activity {
             "    el.scrollIntoView({block:'center'});" +
             "    setTimeout(function(){" +
             "      var rect = el.getBoundingClientRect();" +
-            "      var x = rect.left + rect.width/2;" +
-            "      var y = rect.top + rect.height/2;" +
+            "      var dpr = window.devicePixelRatio || 1;" +
+            "      var x = (rect.left + rect.width/2) * dpr;" +
+            "      var y = (rect.top + rect.height/2) * dpr;" +
+            "      Android.onLog('dpr='+dpr+' css=('+Math.round(rect.left+rect.width/2)+','+Math.round(rect.top+rect.height/2)+') px=('+Math.round(x)+','+Math.round(y)+')');" +
             "      Android.tapAt(x, y);" +
             "    }, 300);" +
             "  }" +
