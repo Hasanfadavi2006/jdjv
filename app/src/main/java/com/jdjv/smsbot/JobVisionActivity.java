@@ -274,21 +274,26 @@ public class JobVisionActivity extends Activity {
         if (url.contains("account.jobvision.ir") && state == STATE_LOGIN) {
             doLogin();
 
-        } else if (url.contains("employer.jobvision.ir") && state == STATE_LOGIN) {
+        } else if (state == STATE_LOGIN &&
+                   (url.contains("employer.jobvision.ir") || url.startsWith("https://jobvision.ir"))) {
+            // لاگین موفق — حتی اگه به jobvision.ir ریدایرکت شد
             state = STATE_DASHBOARD;
-            log("لاگین موفق!");
+            log("لاگین موفق! رفتن به لیست آگهی‌ها...");
             handler.postDelayed(new Runnable() {
-                @Override public void run() { goToApplicants(); }
-            }, 2000);
+                @Override public void run() {
+                    webView.loadUrl(PANEL_URL + "/jobs");
+                }
+            }, 1500);
 
-        } else if (state == STATE_APPLICANTS && url.contains("employer.jobvision.ir")) {
-            // فقط یه بار extract کن
+        } else if (state == STATE_APPLICANTS && url.contains("employer.jobvision.ir/jobs")) {
+            // روی صفحه آگهی‌ها هستیم — لینک‌ها رو استخراج کن
             state = STATE_RESUME;
             handler.postDelayed(new Runnable() {
                 @Override public void run() { extractApplicantLinks(); }
-            }, 2000);
+            }, 2500);
 
-        } else if (state == STATE_RESUME && !url.contains("employer.jobvision.ir/dashboard")) {
+        } else if (state == STATE_RESUME && url.contains("employer.jobvision.ir") &&
+                   !url.equals(PANEL_URL + "/jobs") && !url.equals(PANEL_URL + "/")) {
             extractResume(url);
         }
     }
@@ -399,67 +404,38 @@ public class JobVisionActivity extends Activity {
         webView.evaluateJavascript(js, null);
     }
 
-    // ─── رفتن به لیست درخواست‌ها ─────────────────────────────────────────────
+    // ─── رفتن به لیست آگهی‌ها ─────────────────────────────────────────────
     private void goToApplicants() {
         state = STATE_APPLICANTS;
-        log("جستجو برای بخش رزومه‌ها در داشبورد...");
-        String js =
-            "(function(){" +
-            // لاگ همه لینک‌های داخلی employer
-            "  var links=document.querySelectorAll('a[href]');" +
-            "  var internal=[];" +
-            "  for(var i=0;i<links.length;i++){" +
-            "    var h=links[i].href+'';" +
-            "    if(h.indexOf('employer.jobvision.ir')!==-1) internal.push(h);" +
-            "  }" +
-            "  if(internal.length) Android.onLog('لینک‌های داخلی: '+internal.join(' | '));" +
-            // tap روی اولین عنصر مرتبط با رزومه / درخواست
-            "  var keywords=['رزومه دریافتی','درخواست‌ها','متقاضیان','رزومه‌ها','applicant','resume'];" +
-            "  var all=document.querySelectorAll('*');" +
-            "  for(var k=0;k<all.length;k++){" +
-            "    var t=(all[k].innerText||'').trim();" +
-            "    for(var m=0;m<keywords.length;m++){" +
-            "      if(t.indexOf(keywords[m])!==-1 && t.length<80){" +
-            "        var r=all[k].getBoundingClientRect();" +
-            "        if(r.width>10&&r.height>10){" +
-            "          var dpr=window.devicePixelRatio||1;" +
-            "          Android.onLog('tap رزومه: \"'+t+'\"');" +
-            "          Android.tapAt((r.left+r.width/2)*dpr,(r.top+r.height/2)*dpr);" +
-            "          return;" +
-            "        }" +
-            "      }" +
-            "    }" +
-            "  }" +
-            "  Android.onLog('بخش رزومه پیدا نشد — URL فعلی: '+location.href);" +
-            "})();";
-        webView.evaluateJavascript(js, null);
+        log("رفتن به لیست آگهی‌های کارفرما...");
+        webView.loadUrl(PANEL_URL + "/jobs");
     }
 
-    // ─── استخراج لینک رزومه‌ها ──────────────────────────────────────────────
+    // ─── استخراج لینک آگهی‌ها از صفحه /jobs ──────────────────────────────────
     private void extractApplicantLinks() {
-        log("در حال جمع‌آوری لینک رزومه‌ها...\nURL فعلی: " + webView.getUrl());
+        log("جمع‌آوری لینک آگهی‌ها از: " + webView.getUrl());
         String js =
             "(function() {" +
-            "  Android.onLog('استخراج از: '+location.href);" +
             "  var urls = [];" +
             "  var all = document.querySelectorAll('a[href]');" +
             "  for (var i = 0; i < all.length; i++) {" +
             "    var h = all[i].href + '';" +
-            // فقط لینک‌های employer.jobvision.ir (نه وبلاگ jobvision.ir)
-            "    if (h.indexOf('employer.jobvision.ir') !== -1 &&" +
-            "        h.indexOf('/dashboard') === -1 &&" +
-            "        h !== 'https://employer.jobvision.ir/') {" +
+            "    if (h.indexOf('employer.jobvision.ir/jobs/') !== -1" +
+            "     || h.indexOf('employer.jobvision.ir/applicant') !== -1" +
+            "     || h.indexOf('employer.jobvision.ir/resume') !== -1) {" +
             "      if (urls.indexOf(h) === -1) urls.push(h);" +
             "    }" +
             "  }" +
-            // data-id روی دکمه‌های مشاهده رزومه
-            "  var btns = document.querySelectorAll('[data-id],[data-resume-id],[data-user-id],[data-applicant-id]');" +
+            // data-id
+            "  var btns = document.querySelectorAll('[data-id],[data-job-id],[data-resume-id]');" +
             "  for (var j = 0; j < btns.length; j++) {" +
-            "    var id = btns[j].getAttribute('data-id') || btns[j].getAttribute('data-resume-id') || btns[j].getAttribute('data-user-id') || btns[j].getAttribute('data-applicant-id');" +
-            "    var u = '" + PANEL_URL + "/resume/' + id;" +
-            "    if (id && urls.indexOf(u) === -1) urls.push(u);" +
+            "    var id = btns[j].getAttribute('data-id') || btns[j].getAttribute('data-job-id');" +
+            "    if (id) {" +
+            "      var u = 'https://employer.jobvision.ir/jobs/' + id;" +
+            "      if (urls.indexOf(u) === -1) urls.push(u);" +
+            "    }" +
             "  }" +
-            "  Android.onLog('لینک‌های employer یافت شد: ' + urls.length + ' | ' + urls.slice(0,3).join(' , '));" +
+            "  Android.onLog('لینک‌های آگهی: ' + urls.length + ' | ' + urls.slice(0,5).join(' | '));" +
             "  Android.onDataExtracted(JSON.stringify({type:'resume_urls', data:urls}));" +
             "})();";
         webView.evaluateJavascript(js, null);
