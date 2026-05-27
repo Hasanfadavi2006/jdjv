@@ -64,13 +64,23 @@ public class SmsReceiver extends BroadcastReceiver {
                 Log.e(TAG, "Claude خطا: " + error);
                 ApiLogger.log(context, "FALLBACK", "fallback به BotRules — خطا: " + error);
                 String reply = BotRules.getReply(text);
-                sendReply(context, from, reply, text);
+                // BotRules رو به SmsLogger ذخیره نکن تا تاریخچه مکالمه کلاس خراب نشه
+                sendReplyNoHistory(context, from, reply, text);
                 pending.finish();
             }
         });
     }
 
     private void sendReply(Context context, String to, String reply, String originalText) {
+        doSend(context, to, reply, originalText, true);
+    }
+
+    // وقتی BotRules fallback می‌کنه — پاسخ رو به تاریخچه ذخیره نکن
+    private void sendReplyNoHistory(Context context, String to, String reply, String originalText) {
+        doSend(context, to, reply, originalText, false);
+    }
+
+    private void doSend(Context context, String to, String reply, String originalText, boolean saveHistory) {
         String stamped = BOT_STAMP + reply;
         try {
             SmsManager sm = SmsManager.getDefault();
@@ -83,8 +93,12 @@ public class SmsReceiver extends BroadcastReceiver {
                 .putString("last_sent_text", originalText)
                 .apply();
 
-            SmsLogger.save(context, to, reply, false);
-            Log.d(TAG, "جواب Claude ارسال شد به " + to + ": " + reply);
+            if (saveHistory) {
+                SmsLogger.save(context, to, reply, false);
+                Log.d(TAG, "جواب Claude ارسال شد به " + to + ": " + reply);
+            } else {
+                Log.d(TAG, "جواب BotRules (بدون ذخیره در history) به " + to + ": " + reply);
+            }
             context.sendBroadcast(new Intent("com.jdjv.smsbot.NEW_MESSAGE"));
         } catch (Exception e) {
             Log.e(TAG, "خطا در ارسال: " + e.getMessage());

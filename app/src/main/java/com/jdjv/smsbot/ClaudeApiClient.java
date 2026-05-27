@@ -27,6 +27,12 @@ public class ClaudeApiClient {
 
     public static void getReply(final Context ctx, final String sender,
                                 final String newMessage, final Callback cb) {
+        attemptRequest(ctx, sender, newMessage, cb, 2);
+    }
+
+    private static void attemptRequest(final Context ctx, final String sender,
+                                       final String newMessage, final Callback cb,
+                                       final int retriesLeft) {
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
@@ -42,7 +48,7 @@ public class ClaudeApiClient {
                     List<SmsLogger.Entry> window = hist.subList(start, hist.size());
                     ApiLogger.log(ctx, "HIST", "تاریخچه: " + window.size() + " پیام از " + sender);
 
-                    // ─ ساخت آرایه messages با چک alternating
+                    // ─ ساخت آرایه messages
                     JSONArray messages = new JSONArray();
                     String lastRole = null;
                     for (SmsLogger.Entry e : window) {
@@ -54,16 +60,12 @@ public class ClaudeApiClient {
                         messages.put(m);
                         lastRole = role;
                     }
-
-                    // اضافه کردن پیام جدید
                     if (!"user".equals(lastRole)) {
                         JSONObject cur = new JSONObject();
                         cur.put("role", "user");
                         cur.put("content", newMessage);
                         messages.put(cur);
                     }
-
-                    // اگه خالی یا اولی assistant بود
                     if (messages.length() == 0 ||
                         !"user".equals(messages.getJSONObject(0).getString("role"))) {
                         JSONArray fixed = new JSONArray();
@@ -74,7 +76,7 @@ public class ClaudeApiClient {
                         messages = fixed;
                     }
 
-                    ApiLogger.log(ctx, "REQ", "ارسال به Claude — " + messages.length() + " پیام در context");
+                    ApiLogger.log(ctx, "REQ", "ارسال به Claude — " + messages.length() + " پیام در context (تلاش " + (3 - retriesLeft) + ")");
 
                     // ─ ساخت body
                     JSONObject body = new JSONObject();
@@ -123,6 +125,11 @@ public class ClaudeApiClient {
                                           .trim();
                         ApiLogger.log(ctx, "REPLY", "جواب Claude: " + reply);
                         cb.onReply(reply);
+                    } else if ((code == 529 || code == 503 || code == 502 || code >= 500) && retriesLeft > 0) {
+                        // خطای سرور — retry بعد از ۳ ثانیه
+                        ApiLogger.log(ctx, "RETRY", "خطا " + code + " — تلاش مجدد (" + retriesLeft + " مانده)");
+                        try { Thread.sleep(3000); } catch (Exception ignored) {}
+                        attemptRequest(ctx, sender, newMessage, cb, retriesLeft - 1);
                     } else {
                         String err = sb.toString();
                         if (err.length() > 200) err = err.substring(0, 200);
@@ -130,6 +137,16 @@ public class ClaudeApiClient {
                         cb.onError("API " + code + ": " + err);
                     }
 
+                } catch (java.net.UnknownHostException | java.net.SocketTimeoutException | java.net.ConnectException e) {
+                    // خطای شبکه — retry
+                    if (retriesLeft > 0) {
+                        ApiLogger.log(ctx, "RETRY", "خطای شبکه: " + e.getMessage() + " — تلاش مجدد (" + retriesLeft + " مانده)");
+                        try { Thread.sleep(4000); } catch (Exception ignored) {}
+                        attemptRequest(ctx, sender, newMessage, cb, retriesLeft - 1);
+                    } else {
+                        ApiLogger.log(ctx, "EXC", "شبکه قطع است (همه تلاش‌ها شکست خورد): " + e.getMessage());
+                        cb.onError("شبکه: " + e.getMessage());
+                    }
                 } catch (Exception e) {
                     ApiLogger.log(ctx, "EXC", e.getClass().getSimpleName() + ": " + e.getMessage());
                     cb.onError("خطا: " + e.getMessage());
