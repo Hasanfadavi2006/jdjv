@@ -39,9 +39,10 @@ public class ClaudeApiClient {
 
     // ─── خواندن تاریخچه از گوشی ─────────────────────────────────────────────
     private static JSONArray buildMessages(Context ctx, String sender, String newMessage,
-                                           StringBuilder ctxLog) throws Exception {
-        List<String> bodies   = new ArrayList<>();
+                                           StringBuilder ctxLog, StringBuilder styleCtx) throws Exception {
+        List<String> bodies    = new ArrayList<>();
         List<Boolean> incomings = new ArrayList<>();
+        List<Long> dates       = new ArrayList<>();
 
         try {
             Uri uri = Uri.parse("content://sms/");
@@ -66,6 +67,7 @@ public class ClaudeApiClient {
                     if (body.trim().isEmpty()) continue;
                     bodies.add(body.trim());
                     incomings.add(type == 1);
+                    dates.add(c.getLong(2));
                     fetched++;
                 }
                 c.close();
@@ -76,6 +78,7 @@ public class ClaudeApiClient {
 
         Collections.reverse(bodies);
         Collections.reverse(incomings);
+        Collections.reverse(dates);
 
         // حذف تکراری اگه newMessage آخرین پیام باشه
         if (!bodies.isEmpty()
@@ -83,9 +86,12 @@ public class ClaudeApiClient {
                 && bodies.get(bodies.size() - 1).equals(newMessage)) {
             bodies.remove(bodies.size() - 1);
             incomings.remove(incomings.size() - 1);
+            dates.remove(dates.size() - 1);
         }
 
         int start = Math.max(0, bodies.size() - HISTORY);
+        long now = System.currentTimeMillis();
+        long ONE_HOUR = 3_600_000L;
 
         // ─ لاگ context با رنگ‌گذاری ─
         ctxLog.append("── context ارسالی به Claude ──\n");
@@ -93,15 +99,24 @@ public class ClaudeApiClient {
         String lastRole = null;
         for (int i = start; i < bodies.size(); i++) {
             boolean inc = incomings.get(i);
-            String role = inc ? "user" : "assistant";
+            String role  = inc ? "user" : "assistant";
             String label = inc ? "  [طرف مقابل]" : "  [من - حسن ]";
-            ctxLog.append(label).append(": ").append(bodies.get(i)).append("\n");
-            if (role.equals(lastRole)) continue;
-            JSONObject m = new JSONObject();
-            m.put("role", role);
-            m.put("content", bodies.get(i));
-            messages.put(m);
-            lastRole = role;
+            boolean isOld = (now - dates.get(i)) > ONE_HOUR;
+
+            if (isOld) {
+                // پیام قدیمی‌تر از ۱ ساعت — فقط برای تشخیص سبک، نه ادامه موضوع
+                styleCtx.append(label).append(": ").append(bodies.get(i)).append("\n");
+                ctxLog.append("  [قدیمی-سبک]").append(label).append(": ").append(bodies.get(i)).append("\n");
+            } else {
+                ctxLog.append(label).append(": ").append(bodies.get(i)).append("\n");
+                if (!role.equals(lastRole)) {
+                    JSONObject m = new JSONObject();
+                    m.put("role", role);
+                    m.put("content", bodies.get(i));
+                    messages.put(m);
+                    lastRole = role;
+                }
+            }
         }
         ctxLog.append("  [پیام جدید ]: ").append(newMessage).append("\n");
         ctxLog.append("──────────────────────────────\n");
@@ -173,7 +188,8 @@ public class ClaudeApiClient {
             @Override public void run() {
                 try {
                     StringBuilder ctxLog = new StringBuilder();
-                    JSONArray messages = buildMessages(ctx, sender, newMessage, ctxLog);
+                    StringBuilder styleCtx = new StringBuilder();
+                    JSONArray messages = buildMessages(ctx, sender, newMessage, ctxLog, styleCtx);
                     saveContactContext(ctx, sender, ctxLog.toString());
                     ApiLogger.log(ctx, "HIST", messages.length() + " پیام از گوشی برای " + sender);
                     ApiLogger.log(ctx, "CTX", ctxLog.toString());
@@ -193,6 +209,11 @@ public class ClaudeApiClient {
                     sys.append("امروز: ").append(nowDate).append("، ساعت: ").append(nowTime).append(".\n");
                     if (!personalInfo.isEmpty()) {
                         sys.append("اطلاعات بیشتر درباره خودت: ").append(personalInfo).append("\n");
+                    }
+                    if (styleCtx.length() > 0) {
+                        sys.append("سابقه مکالمات قدیمی با این شخص (بیشتر از یک ساعت پیش — موضوعشون تموم شده):\n");
+                        sys.append("فقط از این پیام‌ها سبک و لحن مکالمه رو بفهم (رسمی/غیررسمی/صمیمی)، نه موضوعشون رو ادامه بده:\n");
+                        sys.append(styleCtx.toString()).append("\n");
                     }
                     sys.append("قوانین:\n");
                     sys.append("- هرگز نگو هوش مصنوعی یا دستیار هستی. اگه پرسیدن بگو خودتی.\n");
