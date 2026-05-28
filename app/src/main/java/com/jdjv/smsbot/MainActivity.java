@@ -127,6 +127,10 @@ public class MainActivity extends Activity {
         infoEdit.setBackgroundColor(Color.parseColor("#1E1E1E"));
         infoEdit.setPadding(12, 12, 12, 12);
         infoEdit.setMinLines(3);
+        infoEdit.setMaxLines(5);
+        infoEdit.setVerticalScrollBarEnabled(true);
+        infoEdit.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
+        infoEdit.setMovementMethod(android.text.method.ScrollingMovementMethod.getInstance());
         infoEdit.setGravity(Gravity.TOP);
         infoEdit.setText(getSharedPreferences("smsbot", MODE_PRIVATE).getString("personal_info", ""));
         LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(
