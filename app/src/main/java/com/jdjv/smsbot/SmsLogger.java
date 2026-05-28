@@ -55,4 +55,30 @@ public class SmsLogger {
         } catch (Exception e) { /* ignore */ }
         return list;
     }
+
+    // oldest-first for a single contact
+    public static List<Entry> loadBySender(Context ctx, String sender) {
+        String alt = altPhone(sender);
+        SharedPreferences prefs = ctx.getSharedPreferences("smsbot", Context.MODE_PRIVATE);
+        List<Entry> list = new ArrayList<>();
+        try {
+            JSONArray arr = new JSONArray(prefs.getString(KEY, "[]"));
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                String s = o.getString("sender");
+                if (s.equals(sender) || s.equals(alt)) {
+                    list.add(new Entry(s, o.getString("text"),
+                        o.getString("time"), o.getBoolean("incoming")));
+                }
+            }
+        } catch (Exception e) { /* ignore */ }
+        return list;
+    }
+
+    private static String altPhone(String phone) {
+        if (phone == null) return "";
+        if (phone.startsWith("+98")) return "0" + phone.substring(3);
+        if (phone.startsWith("0") && phone.length() >= 10) return "+98" + phone.substring(1);
+        return phone;
+    }
 }

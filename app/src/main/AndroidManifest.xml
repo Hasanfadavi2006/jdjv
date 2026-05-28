@@ -47,6 +47,11 @@
             android:exported="false"
             android:label="Crash Log" />
 
+        <activity
+            android:name=".ContactDetailActivity"
+            android:exported="false"
+            android:label="جزئیات مکالمه" />
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">

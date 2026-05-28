@@ -130,6 +130,41 @@ public class ClaudeApiClient {
         return phone;
     }
 
+    // ─── ذخیره/خواندن context به ازای هر شخص ──────────────────────────────────
+    private static String normalizePhone(String phone) {
+        if (phone == null) return "unknown";
+        if (phone.startsWith("0") && phone.length() >= 10) return "+98" + phone.substring(1);
+        return phone;
+    }
+
+    static void saveContactContext(Context ctx, String sender, String context) {
+        String filename = "ctx_" + normalizePhone(sender).replaceAll("[^0-9]", "") + ".txt";
+        try {
+            java.io.FileWriter fw = new java.io.FileWriter(
+                new java.io.File(ctx.getApplicationContext().getFilesDir(), filename), false);
+            fw.write(context);
+            fw.close();
+        } catch (Exception ignored) {}
+    }
+
+    public static String readContactContext(Context ctx, String sender) {
+        for (String s : new String[]{sender, altPhone(sender)}) {
+            String filename = "ctx_" + normalizePhone(s).replaceAll("[^0-9]", "") + ".txt";
+            try {
+                java.io.File f = new java.io.File(ctx.getApplicationContext().getFilesDir(), filename);
+                if (!f.exists()) continue;
+                BufferedReader br = new BufferedReader(new InputStreamReader(
+                    new java.io.FileInputStream(f), "UTF-8"));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line).append("\n");
+                br.close();
+                return sb.toString();
+            } catch (Exception ignored) {}
+        }
+        return "";
+    }
+
     // ─── ارسال به Claude با retry ─────────────────────────────────────────────
     private static void attemptRequest(final Context ctx, final String sender,
                                        final String newMessage, final Callback cb,
@@ -139,6 +174,7 @@ public class ClaudeApiClient {
                 try {
                     StringBuilder ctxLog = new StringBuilder();
                     JSONArray messages = buildMessages(ctx, sender, newMessage, ctxLog);
+                    saveContactContext(ctx, sender, ctxLog.toString());
                     ApiLogger.log(ctx, "HIST", messages.length() + " پیام از گوشی برای " + sender);
                     ApiLogger.log(ctx, "CTX", ctxLog.toString());
                     ApiLogger.log(ctx, "REQ", "ارسال به Claude " + MODEL + " (تلاش " + (3 - retriesLeft) + ")");

@@ -12,7 +12,8 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.ArrayAdapter;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -32,8 +33,8 @@ public class MainActivity extends Activity {
 
     private Button toggleBtn;
     private TextView statusTv;
-    private ArrayAdapter<String> adapter;
-    private final List<String> logs = new ArrayList<String>();
+    private BaseAdapter adapter;
+    private final List<SmsLogger.Entry> smsEntries = new ArrayList<>();
 
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override
@@ -158,7 +159,9 @@ public class MainActivity extends Activity {
         logLabel.setPadding(0, 24, 0, 8);
         root.addView(logLabel);
 
-        ListView listView = new ListView(this);
+        final ListView listView = new ListView(this);
+        listView.setDividerHeight(1);
+        listView.setDivider(new android.graphics.drawable.ColorDrawable(Color.parseColor("#2A2A2A")));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
         listView.setLayoutParams(lp);
@@ -166,8 +169,50 @@ public class MainActivity extends Activity {
 
         setContentView(root);
 
-        adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, logs);
+        adapter = new BaseAdapter() {
+            @Override public int getCount() { return smsEntries.size(); }
+            @Override public Object getItem(int i) { return smsEntries.get(i); }
+            @Override public long getItemId(int i) { return i; }
+            @Override public View getView(int pos, View v, ViewGroup parent) {
+                LinearLayout row;
+                TextView headerTv, bodyTv;
+                if (v == null) {
+                    row = new LinearLayout(MainActivity.this);
+                    row.setOrientation(LinearLayout.VERTICAL);
+                    row.setPadding(20, 10, 20, 10);
+                    headerTv = new TextView(MainActivity.this);
+                    headerTv.setTextSize(12);
+                    headerTv.setTag("h");
+                    bodyTv = new TextView(MainActivity.this);
+                    bodyTv.setTextSize(15);
+                    bodyTv.setTextColor(Color.WHITE);
+                    bodyTv.setTag("b");
+                    row.addView(headerTv);
+                    row.addView(bodyTv);
+                } else {
+                    row = (LinearLayout) v;
+                    headerTv = (TextView) row.getChildAt(0);
+                    bodyTv = (TextView) row.getChildAt(1);
+                }
+                SmsLogger.Entry e = smsEntries.get(pos);
+                String dir = e.incoming ? "از: " : "به: ";
+                headerTv.setText("[" + e.time + "]  " + dir + e.sender);
+                headerTv.setTextColor(e.incoming
+                    ? Color.parseColor("#FFB74D")
+                    : Color.parseColor("#81C784"));
+                bodyTv.setText(e.text);
+                return row;
+            }
+        };
         listView.setAdapter(adapter);
+        listView.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+            @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
+                android.content.Intent intent = new android.content.Intent(
+                    MainActivity.this, ContactDetailActivity.class);
+                intent.putExtra("sender", smsEntries.get(pos).sender);
+                startActivity(intent);
+            }
+        });
 
         checkPermissions();
         updateStatus();
@@ -205,12 +250,8 @@ public class MainActivity extends Activity {
     }
 
     private void refreshLogs() {
-        logs.clear();
-        List<SmsLogger.Entry> entries = SmsLogger.load(this);
-        for (SmsLogger.Entry e : entries) {
-            String dir = e.incoming ? "از " + e.sender : "به " + e.sender;
-            logs.add("[" + e.time + "] " + dir + "\n" + e.text);
-        }
+        smsEntries.clear();
+        smsEntries.addAll(SmsLogger.load(this));
         adapter.notifyDataSetChanged();
     }
 
