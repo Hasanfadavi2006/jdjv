@@ -112,6 +112,46 @@ public class MainActivity extends Activity {
         });
         root.addView(claudeLogBtn);
 
+        // ─── بخش اطلاعات شخصی ────────────────────────────────────────────────
+        TextView infoLabel = new TextView(this);
+        infoLabel.setText("اطلاعات من (برای جواب دادن شخصی‌تر):");
+        infoLabel.setTextColor(Color.parseColor("#90CAF9"));
+        infoLabel.setPadding(0, 20, 0, 4);
+        root.addView(infoLabel);
+
+        final android.widget.EditText infoEdit = new android.widget.EditText(this);
+        infoEdit.setHint("مثال: مهندس هستم، اهل تهران، دوست دارم کوتاه جواب بدم...");
+        infoEdit.setTextColor(Color.WHITE);
+        infoEdit.setHintTextColor(Color.GRAY);
+        infoEdit.setBackgroundColor(Color.parseColor("#1E1E1E"));
+        infoEdit.setPadding(12, 12, 12, 12);
+        infoEdit.setMinLines(3);
+        infoEdit.setGravity(Gravity.TOP);
+        infoEdit.setText(getSharedPreferences("smsbot", MODE_PRIVATE).getString("personal_info", ""));
+        LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        elp.setMargins(0, 0, 0, 0);
+        infoEdit.setLayoutParams(elp);
+        root.addView(infoEdit);
+
+        Button saveInfoBtn = new Button(this);
+        saveInfoBtn.setText("ذخیره اطلاعات");
+        saveInfoBtn.setBackgroundColor(Color.parseColor("#2E7D32"));
+        saveInfoBtn.setTextColor(Color.WHITE);
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        slp.setMargins(0, 4, 0, 0);
+        saveInfoBtn.setLayoutParams(slp);
+        saveInfoBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                String info = infoEdit.getText().toString().trim();
+                getSharedPreferences("smsbot", MODE_PRIVATE)
+                    .edit().putString("personal_info", info).apply();
+                Toast.makeText(MainActivity.this, "ذخیره شد", Toast.LENGTH_SHORT).show();
+            }
+        });
+        root.addView(saveInfoBtn);
+
         TextView logLabel = new TextView(this);
         logLabel.setText("لاگ پیام‌ها:");
         logLabel.setTextColor(Color.LTGRAY);

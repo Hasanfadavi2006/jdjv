@@ -6,9 +6,12 @@ import android.net.Uri;
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -19,10 +22,10 @@ public class ClaudeApiClient {
         .append("Caf-KxCbusvOcho4LRRFW7uzAsPryz40u9DROMljt")
         .append("IVs4btio6NYiWqmlRxD_CPD1YD1g-rhQJgAAA")
         .toString();
-    private static final String API_URL  = "https://api.anthropic.com/v1/messages";
-    private static final String MODEL    = "claude-sonnet-4-6";
-    private static final String STAMP    = "​"; // zero-width space روی پیام‌های بات
-    private static final int    HISTORY  = 50;
+    private static final String API_URL = "https://api.anthropic.com/v1/messages";
+    private static final String MODEL   = "claude-opus-4-7";
+    private static final String STAMP   = "​";
+    private static final int    HISTORY = 50;
 
     public interface Callback {
         void onReply(String reply);
@@ -34,8 +37,9 @@ public class ClaudeApiClient {
         attemptRequest(ctx, sender, newMessage, cb, 2);
     }
 
-    // ─── خواندن تاریخچه SMS از گوشی ──────────────────────────────────────────
-    private static JSONArray buildMessages(Context ctx, String sender, String newMessage) throws Exception {
+    // ─── خواندن تاریخچه از گوشی ─────────────────────────────────────────────
+    private static JSONArray buildMessages(Context ctx, String sender, String newMessage,
+                                           StringBuilder ctxLog) throws Exception {
         List<String> bodies   = new ArrayList<>();
         List<Boolean> incomings = new ArrayList<>();
 
@@ -54,11 +58,10 @@ public class ClaudeApiClient {
             if (c != null) {
                 int fetched = 0;
                 while (c.moveToNext() && fetched < HISTORY * 3) {
-                    int type = c.getInt(1); // 1=inbox 2=sent
-                    if (type != 1 && type != 2) { continue; }
+                    int type = c.getInt(1);
+                    if (type != 1 && type != 2) continue;
                     String body = c.getString(0);
                     if (body == null || body.trim().isEmpty()) continue;
-                    // حذف stamp از پیام‌های بات
                     if (body.startsWith(STAMP)) body = body.substring(1);
                     if (body.trim().isEmpty()) continue;
                     bodies.add(body.trim());
@@ -68,14 +71,13 @@ public class ClaudeApiClient {
                 c.close();
             }
         } catch (Exception e) {
-            ApiLogger.log(ctx, "SMS_DB", "خطا در خواندن DB گوشی: " + e.getMessage());
+            ApiLogger.log(ctx, "SMS_DB", "خطا: " + e.getMessage());
         }
 
-        // ترتیب زمانی (قدیمی‌ترین اول)
         Collections.reverse(bodies);
         Collections.reverse(incomings);
 
-        // اگه آخرین پیام همین newMessage بود، حذفش کن تا تکراری نشه
+        // حذف تکراری اگه newMessage آخرین پیام باشه
         if (!bodies.isEmpty()
                 && Boolean.TRUE.equals(incomings.get(incomings.size() - 1))
                 && bodies.get(bodies.size() - 1).equals(newMessage)) {
@@ -83,30 +85,33 @@ public class ClaudeApiClient {
             incomings.remove(incomings.size() - 1);
         }
 
-        // آخرین HISTORY پیام
         int start = Math.max(0, bodies.size() - HISTORY);
 
+        // ─ لاگ context با رنگ‌گذاری ─
+        ctxLog.append("── context ارسالی به Claude ──\n");
         JSONArray messages = new JSONArray();
         String lastRole = null;
         for (int i = start; i < bodies.size(); i++) {
-            String role = incomings.get(i) ? "user" : "assistant";
-            if (role.equals(lastRole)) continue; // alternating اجباری
+            boolean inc = incomings.get(i);
+            String role = inc ? "user" : "assistant";
+            String label = inc ? "  [طرف مقابل]" : "  [من - حسن ]";
+            ctxLog.append(label).append(": ").append(bodies.get(i)).append("\n");
+            if (role.equals(lastRole)) continue;
             JSONObject m = new JSONObject();
             m.put("role", role);
             m.put("content", bodies.get(i));
             messages.put(m);
             lastRole = role;
         }
+        ctxLog.append("  [پیام جدید ]: ").append(newMessage).append("\n");
+        ctxLog.append("──────────────────────────────\n");
 
-        // اضافه کردن پیام جاری
         if (!"user".equals(lastRole)) {
             JSONObject cur = new JSONObject();
             cur.put("role", "user");
             cur.put("content", newMessage);
             messages.put(cur);
         }
-
-        // اگه آرایه خالی بود یا اولی assistant
         if (messages.length() == 0 ||
             !"user".equals(messages.getJSONObject(0).getString("role"))) {
             messages = new JSONArray();
@@ -115,11 +120,9 @@ public class ClaudeApiClient {
             cur.put("content", newMessage);
             messages.put(cur);
         }
-
         return messages;
     }
 
-    // تبدیل فرمت شماره: +98... ↔ 0...
     private static String altPhone(String phone) {
         if (phone == null) return "";
         if (phone.startsWith("+98")) return "0" + phone.substring(3);
@@ -127,29 +130,47 @@ public class ClaudeApiClient {
         return phone;
     }
 
-    // ─── ارسال درخواست به Claude با retry ────────────────────────────────────
+    // ─── ارسال به Claude با retry ─────────────────────────────────────────────
     private static void attemptRequest(final Context ctx, final String sender,
                                        final String newMessage, final Callback cb,
                                        final int retriesLeft) {
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
-                    JSONArray messages = buildMessages(ctx, sender, newMessage);
+                    StringBuilder ctxLog = new StringBuilder();
+                    JSONArray messages = buildMessages(ctx, sender, newMessage, ctxLog);
                     ApiLogger.log(ctx, "HIST", messages.length() + " پیام از گوشی برای " + sender);
-                    ApiLogger.log(ctx, "REQ",  "ارسال به Claude (تلاش " + (3 - retriesLeft) + ")");
+                    ApiLogger.log(ctx, "CTX", ctxLog.toString());
+                    ApiLogger.log(ctx, "REQ", "ارسال به Claude " + MODEL + " (تلاش " + (3 - retriesLeft) + ")");
+
+                    // ─ اطلاعات شخصی کاربر ─
+                    String personalInfo = ctx.getSharedPreferences("smsbot", Context.MODE_PRIVATE)
+                        .getString("personal_info", "");
+
+                    // ─ تاریخ و ساعت واقعی ─
+                    String nowDate = new SimpleDateFormat("EEEE, yyyy-MM-dd", Locale.ENGLISH).format(new Date());
+                    String nowTime = new SimpleDateFormat("HH:mm", Locale.ENGLISH).format(new Date());
+
+                    // ─ system prompt ─
+                    StringBuilder sys = new StringBuilder();
+                    sys.append("تو حسن فدوی هستی — یه آدم واقعی ایرانی. داری از گوشیت SMS جواب می‌دی.\n");
+                    sys.append("امروز: ").append(nowDate).append("، ساعت: ").append(nowTime).append(".\n");
+                    if (!personalInfo.isEmpty()) {
+                        sys.append("اطلاعات بیشتر درباره خودت: ").append(personalInfo).append("\n");
+                    }
+                    sys.append("قوانین:\n");
+                    sys.append("- هرگز نگو هوش مصنوعی یا دستیار هستی. اگه پرسیدن بگو خودتی.\n");
+                    sys.append("- تاریخچه مکالمه با این شخص رو خوندی؛ لحن و موضوع رو ادامه بده.\n");
+                    sys.append("- جواب‌ها کوتاه و طبیعی مثل SMS واقعی (۱-۳ جمله).\n");
+                    sys.append("- اگه سوالی درباره تاریخ/ساعت/اخبار پرسیدن، از اطلاعات بالا استفاده کن.\n");
+                    sys.append("- اگه سوالی داری که جوابش رو نمی‌دونی، طبیعی بگو نمی‌دونم.\n");
+                    sys.append("- فارسی جواب بده مگه طرف انگلیسی بنویسه.\n");
+                    sys.append("- با هر شخص بر اساس رابطه‌ای که در پیام‌های قبلی بوده جواب بده.");
 
                     JSONObject body = new JSONObject();
                     body.put("model", MODEL);
                     body.put("max_tokens", 400);
-                    body.put("system",
-                        "تو حسن فدوی هستی — یه آدم واقعی ایرانی. " +
-                        "داری از گوشیت SMS جواب می‌دی. " +
-                        "هرگز نگو که هوش مصنوعی یا دستیار هستی. اگه کسی پرسید بگو خودتی. " +
-                        "تاریخچه مکالمه با این شخص رو خوندی و بر اساس اون جواب بده. " +
-                        "لحن طبیعی، صمیمی و مثل یه آدم معمولی که داره SMS می‌زنه. " +
-                        "جواب‌ها کوتاه باشن (۱-۳ جمله). " +
-                        "اگه موضوعی در مکالمه قبلی مطرح شده بود، بهش اشاره کن. " +
-                        "فارسی جواب بده مگه طرف انگلیسی بنویسه.");
+                    body.put("system", sys.toString());
                     body.put("messages", messages);
 
                     URL url = new URL(API_URL);
@@ -159,8 +180,8 @@ public class ClaudeApiClient {
                     conn.setRequestProperty("anthropic-version", "2023-06-01");
                     conn.setRequestProperty("content-type", "application/json");
                     conn.setDoOutput(true);
-                    conn.setConnectTimeout(15000);
-                    conn.setReadTimeout(30000);
+                    conn.setConnectTimeout(20000);
+                    conn.setReadTimeout(40000);
 
                     byte[] bytes = body.toString().getBytes("UTF-8");
                     OutputStream os = conn.getOutputStream();
@@ -200,7 +221,7 @@ public class ClaudeApiClient {
                 } catch (java.net.UnknownHostException | java.net.SocketTimeoutException |
                          java.net.ConnectException e) {
                     if (retriesLeft > 0) {
-                        ApiLogger.log(ctx, "RETRY", "شبکه: " + e.getMessage() + " — retry (" + retriesLeft + ")");
+                        ApiLogger.log(ctx, "RETRY", "شبکه: " + e.getMessage() + " (" + retriesLeft + ")");
                         try { Thread.sleep(4000); } catch (Exception ignored) {}
                         attemptRequest(ctx, sender, newMessage, cb, retriesLeft - 1);
                     } else {
