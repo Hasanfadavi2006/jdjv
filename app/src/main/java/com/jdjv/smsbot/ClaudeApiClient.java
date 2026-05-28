@@ -26,10 +26,58 @@ public class ClaudeApiClient {
     private static final String MODEL   = "claude-opus-4-7";
     private static final String STAMP   = "​";
     private static final int    HISTORY = 50;
+    // قیمت claude-opus (دلار به ازای یک میلیون توکن)
+    private static final double PRICE_IN_PER_MTOK  = 15.0;
+    private static final double PRICE_OUT_PER_MTOK = 75.0;
 
     public interface Callback {
-        void onReply(String reply);
+        void onReply(String reply, double costUsd);
         void onError(String error);
+    }
+
+    public interface BalanceCallback {
+        void onResult(String text);
+    }
+
+    public static void getBalance(final Context ctx, final BalanceCallback cb) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    URL url = new URL("https://api.anthropic.com/v1/organizations/me");
+                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("GET");
+                    conn.setRequestProperty("x-api-key", API_KEY);
+                    conn.setRequestProperty("anthropic-version", "2023-06-01");
+                    conn.setConnectTimeout(10000);
+                    conn.setReadTimeout(10000);
+
+                    int code = conn.getResponseCode();
+                    InputStream is = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
+                    BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) sb.append(line);
+                    br.close();
+
+                    if (code == 200) {
+                        JSONObject resp = new JSONObject(sb.toString());
+                        // تلاش برای پیدا کردن فیلد موجودی در پاسخ
+                        if (resp.has("credit_balance")) {
+                            cb.onResult("$" + String.format("%.4f", resp.getDouble("credit_balance")));
+                        } else if (resp.has("credits")) {
+                            cb.onResult("$" + String.format("%.4f", resp.getDouble("credits")));
+                        } else {
+                            // API موجودی برنمی‌گردونه — باید از console بررسی کرد
+                            cb.onResult("console.anthropic.com");
+                        }
+                    } else {
+                        cb.onResult("console.anthropic.com");
+                    }
+                } catch (Exception e) {
+                    cb.onResult("console.anthropic.com");
+                }
+            }
+        }).start();
     }
 
     public static void getReply(final Context ctx, final String sender,
@@ -260,8 +308,18 @@ public class ClaudeApiClient {
                         String reply = resp.getJSONArray("content")
                                           .getJSONObject(0)
                                           .getString("text").trim();
+                        // محاسبه هزینه از توکن‌های مصرف‌شده
+                        double costUsd = 0;
+                        JSONObject usage = resp.optJSONObject("usage");
+                        if (usage != null) {
+                            int inTok  = usage.optInt("input_tokens", 0);
+                            int outTok = usage.optInt("output_tokens", 0);
+                            costUsd = (inTok * PRICE_IN_PER_MTOK + outTok * PRICE_OUT_PER_MTOK) / 1_000_000.0;
+                            ApiLogger.log(ctx, "COST", "in=" + inTok + " out=" + outTok
+                                + " => $" + String.format("%.6f", costUsd));
+                        }
                         ApiLogger.log(ctx, "REPLY", reply);
-                        cb.onReply(reply);
+                        cb.onReply(reply, costUsd);
 
                     } else if ((code >= 500 || code == 529) && retriesLeft > 0) {
                         ApiLogger.log(ctx, "RETRY", "خطا " + code + " — retry (" + retriesLeft + ")");

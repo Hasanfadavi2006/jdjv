@@ -33,6 +33,7 @@ public class MainActivity extends Activity {
 
     private Button toggleBtn;
     private TextView statusTv;
+    private TextView totalCostField;
     private BaseAdapter adapter;
     private final List<SmsLogger.Entry> smsEntries = new ArrayList<>();
 
@@ -58,10 +59,45 @@ public class MainActivity extends Activity {
         title.setGravity(Gravity.CENTER);
         root.addView(title);
 
+        // ─── ردیف موجودی و هزینه کل ────────────────────────────────────────────
+        LinearLayout balanceRow = new LinearLayout(this);
+        balanceRow.setOrientation(LinearLayout.HORIZONTAL);
+        balanceRow.setBackgroundColor(Color.parseColor("#1A1A1A"));
+        balanceRow.setPadding(12, 8, 12, 8);
+        LinearLayout.LayoutParams brp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        brp.setMargins(0, 4, 0, 4);
+        balanceRow.setLayoutParams(brp);
+
+        final TextView balanceTv = new TextView(this);
+        balanceTv.setText("موجودی: ...");
+        balanceTv.setTextColor(Color.parseColor("#FFD54F"));
+        balanceTv.setTextSize(12);
+        balanceTv.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        balanceRow.addView(balanceTv);
+
+        final TextView totalCostTv = new TextView(this);
+        totalCostTv.setTextColor(Color.parseColor("#A5D6A7"));
+        totalCostTv.setTextSize(12);
+        totalCostTv.setGravity(android.view.Gravity.END);
+        totalCostTv.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        balanceRow.addView(totalCostTv);
+
+        Button refreshBalBtn = new Button(this);
+        refreshBalBtn.setText("↻");
+        refreshBalBtn.setTextSize(14);
+        refreshBalBtn.setBackgroundColor(Color.parseColor("#263238"));
+        refreshBalBtn.setTextColor(Color.parseColor("#FFD54F"));
+        LinearLayout.LayoutParams rbp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        refreshBalBtn.setLayoutParams(rbp);
+        balanceRow.addView(refreshBalBtn);
+        root.addView(balanceRow);
+
         statusTv = new TextView(this);
         statusTv.setTextSize(16);
         statusTv.setGravity(Gravity.CENTER);
-        statusTv.setPadding(0, 16, 0, 16);
+        statusTv.setPadding(0, 8, 0, 8);
         root.addView(statusTv);
 
         toggleBtn = new Button(this);
@@ -200,7 +236,9 @@ public class MainActivity extends Activity {
                 }
                 SmsLogger.Entry e = smsEntries.get(pos);
                 String dir = e.incoming ? "از: " : "به: ";
-                headerTv.setText("[" + e.time + "]  " + dir + e.sender);
+                String costStr = (!e.incoming && e.costUsd > 0)
+                    ? "   $" + String.format("%.5f", e.costUsd) : "";
+                headerTv.setText("[" + e.time + "]  " + dir + e.sender + costStr);
                 headerTv.setTextColor(e.incoming
                     ? Color.parseColor("#FFB74D")
                     : Color.parseColor("#81C784"));
@@ -218,9 +256,18 @@ public class MainActivity extends Activity {
             }
         });
 
+        totalCostField = totalCostTv;
         checkPermissions();
         updateStatus();
         refreshLogs();
+        fetchBalance(balanceTv);
+
+        refreshBalBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                balanceTv.setText("موجودی: ...");
+                fetchBalance(balanceTv);
+            }
+        });
 
         toggleBtn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -257,6 +304,27 @@ public class MainActivity extends Activity {
         smsEntries.clear();
         smsEntries.addAll(SmsLogger.load(this));
         adapter.notifyDataSetChanged();
+        if (totalCostField != null) {
+            double total = 0;
+            for (SmsLogger.Entry e : smsEntries) total += e.costUsd;
+            totalCostField.setText("مخارج کل: $" + String.format("%.5f", total));
+        }
+    }
+
+    private void fetchBalance(final TextView tv) {
+        ClaudeApiClient.getBalance(this, new ClaudeApiClient.BalanceCallback() {
+            @Override public void onResult(final String text) {
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (text.startsWith("$")) {
+                            tv.setText("موجودی: " + text);
+                        } else {
+                            tv.setText("موجودی: " + text);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     private void showClaudeLog() {

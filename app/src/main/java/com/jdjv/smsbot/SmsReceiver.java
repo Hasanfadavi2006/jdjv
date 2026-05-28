@@ -54,9 +54,9 @@ public class SmsReceiver extends BroadcastReceiver {
         final PendingResult pending = goAsync();
         ClaudeApiClient.getReply(context, from, text, new ClaudeApiClient.Callback() {
             @Override
-            public void onReply(String reply) {
+            public void onReply(String reply, double costUsd) {
                 ApiLogger.log(context, "OK", "جواب ارسال به " + from + ": " + reply);
-                sendReply(context, from, reply, text);
+                sendReply(context, from, reply, text, costUsd);
                 pending.finish();
             }
             @Override
@@ -64,23 +64,21 @@ public class SmsReceiver extends BroadcastReceiver {
                 Log.e(TAG, "Claude خطا: " + error);
                 ApiLogger.log(context, "FALLBACK", "fallback به BotRules — خطا: " + error);
                 String reply = BotRules.getReply(text);
-                // BotRules رو به SmsLogger ذخیره نکن تا تاریخچه مکالمه کلاس خراب نشه
                 sendReplyNoHistory(context, from, reply, text);
                 pending.finish();
             }
         });
     }
 
-    private void sendReply(Context context, String to, String reply, String originalText) {
-        doSend(context, to, reply, originalText, true);
+    private void sendReply(Context context, String to, String reply, String originalText, double costUsd) {
+        doSend(context, to, reply, originalText, true, costUsd);
     }
 
-    // وقتی BotRules fallback می‌کنه — پاسخ رو به تاریخچه ذخیره نکن
     private void sendReplyNoHistory(Context context, String to, String reply, String originalText) {
-        doSend(context, to, reply, originalText, false);
+        doSend(context, to, reply, originalText, false, 0.0);
     }
 
-    private void doSend(Context context, String to, String reply, String originalText, boolean saveHistory) {
+    private void doSend(Context context, String to, String reply, String originalText, boolean saveHistory, double costUsd) {
         String stamped = BOT_STAMP + reply;
         try {
             SmsManager sm = SmsManager.getDefault();
@@ -94,10 +92,7 @@ public class SmsReceiver extends BroadcastReceiver {
                 .apply();
 
             if (saveHistory) {
-                SmsLogger.save(context, to, reply, false);
-                Log.d(TAG, "جواب Claude ارسال شد به " + to + ": " + reply);
-            } else {
-                Log.d(TAG, "جواب BotRules (بدون ذخیره در history) به " + to + ": " + reply);
+                SmsLogger.save(context, to, reply, false, costUsd);
             }
             context.sendBroadcast(new Intent("com.jdjv.smsbot.NEW_MESSAGE"));
         } catch (Exception e) {
