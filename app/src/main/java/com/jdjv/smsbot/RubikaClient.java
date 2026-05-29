@@ -9,7 +9,7 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.SecureRandom;
-import java.util.Arrays;
+import java.util.Arrays; // SecureRandom still used in randomAuth()
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -34,22 +34,17 @@ public class RubikaClient {
 
     public static String encrypt(String auth, String data) throws Exception {
         byte[] key = createKey(auth).getBytes("UTF-8");
-        byte[] iv  = new byte[16];
-        new SecureRandom().nextBytes(iv);
+        byte[] iv  = Arrays.copyOfRange(key, 0, 16); // IV = 16 bytes اول کلید (پروتکل روبیکا)
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
         byte[] enc = cipher.doFinal(data.getBytes("UTF-8"));
-        byte[] combined = new byte[16 + enc.length];
-        System.arraycopy(iv, 0, combined, 0, 16);
-        System.arraycopy(enc, 0, combined, 16, enc.length);
-        return Base64.encodeToString(combined, Base64.NO_WRAP);
+        return Base64.encodeToString(enc, Base64.NO_WRAP);
     }
 
     public static String decrypt(String auth, String encData) throws Exception {
         byte[] key  = createKey(auth).getBytes("UTF-8");
-        byte[] data = Base64.decode(encData, Base64.NO_WRAP);
-        byte[] iv   = Arrays.copyOfRange(data, 0, 16);
-        byte[] enc  = Arrays.copyOfRange(data, 16, data.length);
+        byte[] iv   = Arrays.copyOfRange(key, 0, 16); // IV = 16 bytes اول کلید
+        byte[] enc  = Base64.decode(encData, Base64.NO_WRAP);
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
         return new String(cipher.doFinal(enc), "UTF-8");
