@@ -41,25 +41,69 @@ public class RubikaClient {
         return Base64.encodeToString(enc, Base64.NO_WRAP);
     }
 
-    // decrypt با IV ثابت (16 بایت اول کلید)
     public static String decrypt(String auth, String encData) throws Exception {
-        byte[] key  = createKey(auth).getBytes("UTF-8");
-        byte[] iv   = Arrays.copyOfRange(key, 0, 16);
-        byte[] enc  = Base64.decode(encData, Base64.DEFAULT);
-        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-        cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
-        return new String(cipher.doFinal(enc), "UTF-8");
+        String result = tryAllDecryptions(auth, encData, null);
+        if (result != null) return result;
+        throw new Exception("decrypt failed for all key/IV variants");
     }
 
-    // decrypt با IV از 16 بایت اول سیفرتکست (روش جایگزین)
-    private static String decryptPrepended(String auth, String encData) throws Exception {
-        byte[] key  = createKey(auth).getBytes("UTF-8");
-        byte[] data = Base64.decode(encData, Base64.DEFAULT);
-        byte[] iv   = Arrays.copyOfRange(data, 0, 16);
-        byte[] enc  = Arrays.copyOfRange(data, 16, data.length);
-        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-        cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
-        return new String(cipher.doFinal(enc), "UTF-8");
+    // امتحان همه ترکیب‌های کلید و IV
+    static String tryAllDecryptions(String auth, String encData, Context ctx) {
+        byte[] ciphertext;
+        try { ciphertext = Base64.decode(encData, Base64.DEFAULT); }
+        catch (Exception e) { return null; }
+
+        byte[] transformedKey;
+        byte[] rawKey;
+        try {
+            transformedKey = createKey(auth).getBytes("UTF-8"); // createKey transform
+            rawKey = auth.getBytes("UTF-8");                     // auth مستقیم
+        } catch (Exception e) { return null; }
+
+        // ترکیب‌های مختلف کلید
+        byte[][] keys = {
+            transformedKey,                                           // AES-256 createKey
+            Arrays.copyOfRange(transformedKey, 0, 16),               // AES-128 createKey
+            rawKey,                                                    // AES-256 raw
+            Arrays.copyOfRange(rawKey, 0, 16),                        // AES-128 raw
+        };
+
+        for (byte[] key : keys) {
+            // IV ثابت = 16 بایت اول کلید
+            byte[] fixedIV = Arrays.copyOfRange(key, 0, Math.min(16, key.length));
+            if (fixedIV.length == 16) {
+                String r = tryDecrypt(key, fixedIV, ciphertext, ctx, "fixedIV-key" + key.length);
+                if (r != null) return r;
+            }
+            // IV از 16 بایت اول سیفرتکست
+            if (ciphertext.length > 16) {
+                byte[] prependIV = Arrays.copyOfRange(ciphertext, 0, 16);
+                byte[] rest = Arrays.copyOfRange(ciphertext, 16, ciphertext.length);
+                String r = tryDecrypt(key, prependIV, rest, ctx, "prependIV-key" + key.length);
+                if (r != null) return r;
+            }
+            // IV صفر
+            byte[] zeroIV = new byte[16];
+            String r = tryDecrypt(key, zeroIV, ciphertext, ctx, "zeroIV-key" + key.length);
+            if (r != null) return r;
+        }
+        if (ctx != null) ApiLogger.log(ctx, "RUBIKA_DEC_FAIL", "all variants failed, cipherLen=" + ciphertext.length);
+        return null;
+    }
+
+    private static String tryDecrypt(byte[] key, byte[] iv, byte[] enc, Context ctx, String label) {
+        if (key.length != 16 && key.length != 24 && key.length != 32) return null;
+        if (iv.length != 16) return null;
+        try {
+            Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
+            String result = new String(c.doFinal(enc), "UTF-8").trim();
+            if (result.startsWith("{") || result.startsWith("[")) {
+                if (ctx != null) ApiLogger.log(ctx, "RUBIKA_DEC_OK", label + " -> " + result.substring(0, Math.min(80, result.length())));
+                return result;
+            }
+        } catch (Exception ignored) {}
+        return null;
     }
 
     public static String randomAuth() {
@@ -120,20 +164,13 @@ public class RubikaClient {
         JSONObject resp = new JSONObject(raw);
         if (resp.has("data_enc")) {
             String encData = resp.getString("data_enc");
-            // روش ۱: IV ثابت (16 بایت اول کلید)
-            try {
-                return new JSONObject(decrypt(auth, encData));
-            } catch (Exception e1) {
-                // روش ۲: IV از 16 بایت اول سیفرتکست
-                try {
-                    return new JSONObject(decryptPrepended(auth, encData));
-                } catch (Exception e2) {
-                    if (ctx != null) ApiLogger.log(ctx, "RUBIKA_DEC",
-                        "fixedIV=" + e1.getMessage() + " | prependIV=" + e2.getMessage()
-                        + " | raw=" + raw.substring(0, Math.min(200, raw.length())));
-                    return resp; // برگردوندن raw — caller خودش handle می‌کنه
-                }
+            String dec = tryAllDecryptions(auth, encData, ctx);
+            if (dec != null) {
+                try { return new JSONObject(dec); } catch (Exception ignored) {}
             }
+            if (ctx != null) ApiLogger.log(ctx, "RUBIKA_DEC_FAIL",
+                "raw=" + raw.substring(0, Math.min(200, raw.length())));
+            return resp;
         }
         return resp;
     }
