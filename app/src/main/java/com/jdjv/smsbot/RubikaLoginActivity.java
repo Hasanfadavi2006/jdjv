@@ -383,18 +383,18 @@ public class RubikaLoginActivity extends Activity {
                         }
                         for (int i = 0; i < chats.length(); i++) {
                             JSONObject chat = chats.getJSONObject(i);
-                            JSONObject obj = chat.optJSONObject("object_data");
-                            if (obj == null) obj = chat.optJSONObject("abs_object");
-                            if (obj == null) obj = chat;
-                            String guid = obj.optString("object_guid",
-                                chat.optString("object_guid", ""));
-                            String titleStr = obj.optString("title",
-                                obj.optString("name",
-                                obj.optString("first_name", guid)));
-                            if (guid.isEmpty()) guid = chat.optString("object_guid", "");
-                            if (!guid.isEmpty() && (guid.startsWith("g0") || guid.startsWith("c0"))) {
-                                groups.add(new String[]{guid, titleStr});
+                            String guid = chat.optString("object_guid", "");
+                            if (guid.isEmpty() || (!guid.startsWith("g0") && !guid.startsWith("c0"))) continue;
+                            // Use last message text as label hint since getChats doesn't return title
+                            String hint = guid;
+                            JSONObject lm = chat.optJSONObject("last_message");
+                            if (lm != null) {
+                                String lmText = lm.optString("text", "").trim();
+                                if (!lmText.isEmpty()) {
+                                    hint = lmText.substring(0, Math.min(30, lmText.length()));
+                                }
                             }
+                            groups.add(new String[]{guid, hint});
                         }
                     }
 

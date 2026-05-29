@@ -279,8 +279,7 @@ public class RubikaClient {
 
     // ─── Authenticated calls ──────────────────────────────────────────────────
 
-    public static JSONObject registerDevice(Context ctx, String auth, PrivateKey pk) throws Exception {
-        JSONObject input = new JSONObject();
+    public static JSONObject registerDevice(Context ctx, String auth, PrivateKey pk) throws Exception {        JSONObject input = new JSONObject();
         input.put("token", "");
         input.put("lang_code", "fa");
         input.put("token_type", "Firebase");
@@ -289,6 +288,31 @@ public class RubikaClient {
         input.put("device_model", "samsungSM-G925F");
         input.put("device_hash", "23121"); // '2' + digits from 'okhttp/3.12.1'
         return callApi(ctx, auth, false, "registerDevice", input, pk);
+    }
+
+    /** Get group title — returns null on failure */
+    public static String getGroupTitle(Context ctx, String auth, PrivateKey pk, String guid) {
+        try {
+            JSONObject input = new JSONObject();
+            String method;
+            String dataKey;
+            if (guid.startsWith("g0")) {
+                input.put("group_guid", guid);
+                method = "getGroupInfo";
+                dataKey = "group";
+            } else {
+                input.put("channel_guid", guid);
+                method = "getChannelInfo";
+                dataKey = "channel";
+            }
+            JSONObject resp = callApi(ctx, auth, false, method, input, pk);
+            JSONObject d = resp.optJSONObject("data");
+            if (d != null) {
+                JSONObject obj = d.optJSONObject(dataKey);
+                if (obj != null) return obj.optString("title", null);
+            }
+        } catch (Exception ignored) {}
+        return null;
     }
 
     public static JSONObject getChats(Context ctx, String auth, PrivateKey pk) throws Exception {

@@ -78,7 +78,13 @@ public class RubikaService extends Service {
         String lastKey = "rubika_last_" + guid;
         long lastMsgId = prefs.getLong(lastKey, 0);
         boolean firstPoll = (lastMsgId == 0);
-        String groupName = prefs.getString("rubika_group_name_" + guid, guid);
+        String groupName = prefs.getString("rubika_group_name_" + guid, "");
+        if (groupName.isEmpty()) {
+            // Fetch and cache group title once
+            String fetched = RubikaClient.getGroupTitle(this, auth, pk, guid);
+            groupName = (fetched != null && !fetched.isEmpty()) ? fetched : guid;
+            prefs.edit().putString("rubika_group_name_" + guid, groupName).apply();
+        }
 
         try {
             JSONObject resp = RubikaClient.getMessages(this, auth, pk, guid, lastMsgId);
