@@ -375,12 +375,23 @@ public class RubikaLoginActivity extends Activity {
                     if (chats == null) chats = resp.optJSONArray("chat_updates");
 
                     if (chats != null) {
+                        // Log first chat raw to see field structure
+                        if (chats.length() > 0) {
+                            ApiLogger.log(RubikaLoginActivity.this, "RUBIKA_CHAT0",
+                                chats.getJSONObject(0).toString().substring(0,
+                                    Math.min(300, chats.getJSONObject(0).toString().length())));
+                        }
                         for (int i = 0; i < chats.length(); i++) {
                             JSONObject chat = chats.getJSONObject(i);
                             JSONObject obj = chat.optJSONObject("object_data");
+                            if (obj == null) obj = chat.optJSONObject("abs_object");
                             if (obj == null) obj = chat;
-                            String guid = obj.optString("object_guid", "");
-                            String titleStr = obj.optString("title", obj.optString("first_name", guid));
+                            String guid = obj.optString("object_guid",
+                                chat.optString("object_guid", ""));
+                            String titleStr = obj.optString("title",
+                                obj.optString("name",
+                                obj.optString("first_name", guid)));
+                            if (guid.isEmpty()) guid = chat.optString("object_guid", "");
                             if (!guid.isEmpty() && (guid.startsWith("g0") || guid.startsWith("c0"))) {
                                 groups.add(new String[]{guid, titleStr});
                             }
