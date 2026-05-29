@@ -77,6 +77,8 @@ public class RubikaService extends Service {
         SharedPreferences prefs = getSharedPreferences("smsbot", Context.MODE_PRIVATE);
         String lastKey = "rubika_last_" + guid;
         long lastMsgId = prefs.getLong(lastKey, 0);
+        boolean firstPoll = (lastMsgId == 0);
+        String groupName = prefs.getString("rubika_group_name_" + guid, guid);
 
         try {
             JSONObject resp = RubikaClient.getMessages(this, auth, pk, guid, lastMsgId);
@@ -98,6 +100,9 @@ public class RubikaService extends Service {
                 if (msgId <= lastMsgId) continue;
                 if (msgId > newLastId) newLastId = msgId;
 
+                // On first poll just advance the cursor — don't reply to history
+                if (firstPoll) continue;
+
                 String text = msg.optString("text", "").trim();
                 if (text.isEmpty()) continue;
 
@@ -107,11 +112,12 @@ public class RubikaService extends Service {
 
                 String senderName = msg.optString("author_title", senderGuid);
 
-                ApiLogger.log(this, "RUBIKA_MSG", guid + " | " + senderName + ": " + text);
+                ApiLogger.log(this, "RUBIKA_MSG", groupName + " | " + senderName + ": " + text);
 
                 final String fAuth = auth;
                 final PrivateKey fPk = pk;
                 final String fGuid = guid;
+                final String fGroupName = groupName;
                 final long fMsgId = msgId;
                 final String fText = text;
                 final String fSender = senderName;
@@ -123,7 +129,7 @@ public class RubikaService extends Service {
                                 RubikaClient.sendMessage(RubikaService.this, fAuth, fPk,
                                     fGuid, reply, fMsgId);
                                 ApiLogger.log(RubikaService.this, "RUBIKA_SENT",
-                                    fGuid + " -> " + reply);
+                                    fGroupName + " -> " + reply);
                             } catch (Exception e) {
                                 ApiLogger.log(RubikaService.this, "RUBIKA_SEND_ERR", e.getMessage());
                             }

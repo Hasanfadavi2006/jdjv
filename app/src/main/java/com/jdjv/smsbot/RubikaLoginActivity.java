@@ -450,11 +450,19 @@ public class RubikaLoginActivity extends Activity {
 
     private void saveSelectedGroups() {
         StringBuilder sb = new StringBuilder();
+        SharedPreferences.Editor ed = getPrefs().edit();
         for (String g : selectedGuids) {
             if (sb.length() > 0) sb.append(",");
             sb.append(g);
+            // Save name for each selected group
+            for (String[] pair : groups) {
+                if (pair[0].equals(g)) {
+                    ed.putString("rubika_group_name_" + g, pair[1]);
+                    break;
+                }
+            }
         }
-        getPrefs().edit().putString("rubika_groups", sb.toString()).apply();
+        ed.putString("rubika_groups", sb.toString()).apply();
     }
 
     private void startRubikaService() {
