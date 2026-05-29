@@ -32,6 +32,7 @@ public class MainActivity extends Activity {
     };
 
     private Button toggleBtn;
+    private Button rubikaStatusBtn;
     private TextView statusTv;
     private TextView totalCostField;
     private BaseAdapter adapter;
@@ -133,6 +134,16 @@ public class MainActivity extends Activity {
             }
         });
         root.addView(jobBtn);
+
+        // ─── دکمه روبیکا ─────────────────────────────────────────────────────
+        Button rubikaBtn = new Button(this);
+        rubikaBtn.setBackgroundColor(Color.parseColor("#6A1B9A"));
+        rubikaBtn.setTextColor(Color.WHITE);
+        LinearLayout.LayoutParams rbkp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rbkp.setMargins(0, 8, 0, 0);
+        rubikaBtn.setLayoutParams(rbkp);
+        root.addView(rubikaBtn);
 
         Button claudeLogBtn = new Button(this);
         claudeLogBtn.setText("لاگ Claude API");
@@ -261,6 +272,14 @@ public class MainActivity extends Activity {
         updateStatus();
         refreshLogs();
         fetchBalance(balanceTv);
+        rubikaStatusBtn = rubikaBtn;
+        updateRubikaBtn(rubikaBtn);
+
+        rubikaBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                startActivity(new android.content.Intent(MainActivity.this, RubikaLoginActivity.class));
+            }
+        });
 
         refreshBalBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
@@ -285,12 +304,25 @@ public class MainActivity extends Activity {
         super.onResume();
         registerReceiver(receiver, new IntentFilter("com.jdjv.smsbot.NEW_MESSAGE"));
         refreshLogs();
+        if (rubikaStatusBtn != null) updateRubikaBtn(rubikaStatusBtn);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         unregisterReceiver(receiver);
+    }
+
+    private void updateRubikaBtn(Button btn) {
+        String auth = getSharedPreferences("smsbot", MODE_PRIVATE).getString("rubika_auth", "");
+        String groups = getSharedPreferences("smsbot", MODE_PRIVATE).getString("rubika_groups", "");
+        if (!auth.isEmpty() && !groups.isEmpty()) {
+            btn.setText("روبیکا: فعال ✓ — تنظیمات");
+            btn.setBackgroundColor(Color.parseColor("#4A148C"));
+        } else {
+            btn.setText("روبیکا — اتصال به حساب");
+            btn.setBackgroundColor(Color.parseColor("#6A1B9A"));
+        }
     }
 
     private void updateStatus() {

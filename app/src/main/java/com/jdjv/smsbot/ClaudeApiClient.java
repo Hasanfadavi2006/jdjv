@@ -228,6 +228,91 @@ public class ClaudeApiClient {
         return "";
     }
 
+    // ─── Rubika: reply for group message ──────────────────────────────────────
+    public static void getRubikaReply(final Context ctx, final String groupGuid,
+                                      final String senderName, final String message,
+                                      final Callback cb) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    String personalInfo = ctx.getSharedPreferences("smsbot", Context.MODE_PRIVATE)
+                        .getString("personal_info", "");
+                    String nowDate = new java.text.SimpleDateFormat("EEEE, yyyy-MM-dd", Locale.ENGLISH)
+                        .format(new Date());
+                    String nowTime = new java.text.SimpleDateFormat("HH:mm", Locale.ENGLISH)
+                        .format(new Date());
+
+                    StringBuilder sys = new StringBuilder();
+                    sys.append("تو حسن فدوی هستی — یه آدم واقعی ایرانی. توی یه گروه روبیکا پیام داری.\n");
+                    sys.append("امروز: ").append(nowDate).append("، ساعت: ").append(nowTime).append(".\n");
+                    if (!personalInfo.isEmpty()) {
+                        sys.append("اطلاعات بیشتر درباره خودت: ").append(personalInfo).append("\n");
+                    }
+                    sys.append("قوانین:\n");
+                    sys.append("- هرگز نگو هوش مصنوعی یا دستیار هستی.\n");
+                    sys.append("- جواب‌ها کوتاه و طبیعی (۱-۳ جمله).\n");
+                    sys.append("- فارسی جواب بده مگه طرف انگلیسی بنویسه.\n");
+                    sys.append("- فرستنده پیام: ").append(senderName).append(".\n");
+
+                    JSONArray messages = new JSONArray();
+                    JSONObject cur = new JSONObject();
+                    cur.put("role", "user");
+                    cur.put("content", senderName + ": " + message);
+                    messages.put(cur);
+
+                    JSONObject body = new JSONObject();
+                    body.put("model", MODEL);
+                    body.put("max_tokens", 300);
+                    body.put("system", sys.toString());
+                    body.put("messages", messages);
+
+                    URL url = new URL(API_URL);
+                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("POST");
+                    conn.setRequestProperty("x-api-key", API_KEY);
+                    conn.setRequestProperty("anthropic-version", "2023-06-01");
+                    conn.setRequestProperty("content-type", "application/json");
+                    conn.setDoOutput(true);
+                    conn.setConnectTimeout(20000);
+                    conn.setReadTimeout(40000);
+
+                    byte[] bytes = body.toString().getBytes("UTF-8");
+                    OutputStream os = conn.getOutputStream();
+                    os.write(bytes);
+                    os.close();
+
+                    int code = conn.getResponseCode();
+                    InputStream is = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
+                    BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) sb.append(line);
+                    br.close();
+
+                    if (code == 200) {
+                        JSONObject resp = new JSONObject(sb.toString());
+                        String reply = resp.getJSONArray("content")
+                            .getJSONObject(0).getString("text").trim();
+                        double costUsd = 0;
+                        JSONObject usage = resp.optJSONObject("usage");
+                        if (usage != null) {
+                            int inTok  = usage.optInt("input_tokens", 0);
+                            int outTok = usage.optInt("output_tokens", 0);
+                            costUsd = (inTok * PRICE_IN_PER_MTOK + outTok * PRICE_OUT_PER_MTOK) / 1_000_000.0;
+                        }
+                        cb.onReply(reply, costUsd);
+                    } else {
+                        String err = sb.toString();
+                        if (err.length() > 200) err = err.substring(0, 200);
+                        cb.onError("Rubika Claude " + code + ": " + err);
+                    }
+                } catch (Exception e) {
+                    cb.onError("Rubika Claude exc: " + e.getMessage());
+                }
+            }
+        }).start();
+    }
+
     // ─── ارسال به Claude با retry ─────────────────────────────────────────────
     private static void attemptRequest(final Context ctx, final String sender,
                                        final String newMessage, final Callback cb,

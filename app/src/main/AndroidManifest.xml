@@ -60,5 +60,14 @@
             </intent-filter>
         </receiver>
 
+        <activity
+            android:name=".RubikaLoginActivity"
+            android:exported="false"
+            android:label="ورود روبیکا" />
+
+        <service
+            android:name=".RubikaService"
+            android:exported="false" />
+
     </application>
 </manifest>
