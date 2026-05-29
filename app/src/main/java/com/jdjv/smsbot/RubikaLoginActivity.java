@@ -327,6 +327,16 @@ public class RubikaLoginActivity extends Activity {
 
                     authToken = finalAuth;
 
+                    // Must registerDevice to activate session before any authenticated calls
+                    try {
+                        JSONObject regResp = RubikaClient.registerDevice(
+                            RubikaLoginActivity.this, finalAuth, finalPk);
+                        ApiLogger.log(RubikaLoginActivity.this, "RUBIKA_REG",
+                            regResp.toString().substring(0, Math.min(80, regResp.toString().length())));
+                    } catch (Exception re) {
+                        ApiLogger.log(RubikaLoginActivity.this, "RUBIKA_REG_ERR", re.getMessage());
+                    }
+
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             statusTv.setText("ورود موفق! در حال بارگذاری گروه‌ها...");

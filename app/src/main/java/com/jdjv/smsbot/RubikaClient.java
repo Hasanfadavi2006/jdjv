@@ -279,6 +279,18 @@ public class RubikaClient {
 
     // ─── Authenticated calls ──────────────────────────────────────────────────
 
+    public static JSONObject registerDevice(Context ctx, String auth, PrivateKey pk) throws Exception {
+        JSONObject input = new JSONObject();
+        input.put("token", "");
+        input.put("lang_code", "fa");
+        input.put("token_type", "Firebase");
+        input.put("app_version", "MA_3.8.2");
+        input.put("system_version", "SDK 22");
+        input.put("device_model", "samsungSM-G925F");
+        input.put("device_hash", "23121"); // '2' + digits from 'okhttp/3.12.1'
+        return callApi(ctx, auth, false, "registerDevice", input, pk);
+    }
+
     public static JSONObject getChats(Context ctx, String auth, PrivateKey pk) throws Exception {
         JSONObject input = new JSONObject();
         input.put("start_id", JSONObject.NULL);
