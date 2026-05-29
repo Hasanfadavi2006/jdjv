@@ -502,8 +502,9 @@ public class RubikaLoginActivity extends Activity {
     private static String normalizePhone(String phone) {
         if (phone == null) return "";
         phone = phone.trim().replaceAll("\\s+", "");
-        if (phone.startsWith("0")) return "+98" + phone.substring(1);
-        if (!phone.startsWith("+")) return "+98" + phone;
+        if (phone.startsWith("0")) return "98" + phone.substring(1);
+        if (phone.startsWith("+")) return phone.substring(1);
+        if (!phone.startsWith("98")) return "98" + phone;
         return phone;
     }
 }
