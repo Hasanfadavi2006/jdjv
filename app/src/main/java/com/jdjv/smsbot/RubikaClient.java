@@ -3,166 +3,165 @@ package com.jdjv.smsbot;
 import android.content.Context;
 import android.util.Base64;
 import javax.crypto.Cipher;
-import javax.crypto.Mac;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.spec.OAEPParameterSpec;
 import java.io.*;
+import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
+import java.security.*;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.*;
 import java.util.Arrays;
-import org.json.JSONArray;
 import org.json.JSONObject;
 
+/**
+ * کلاینت روبیکا — پروتکل API v6 (rubpy-compatible)
+ * Key: passphrase(auth), IV: zero, Field: tmp_session / input / sign
+ */
 public class RubikaClient {
 
-    private static final String CHARS =
-        "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private static final JSONObject CLIENT_INFO;
+    static {
+        JSONObject c = new JSONObject();
+        try {
+            c.put("app_name", "Main");
+            c.put("app_version", "3.8.2");
+            c.put("platform", "Android");
+            c.put("package", "app.rbmain.a");
+        } catch (Exception ignored) {}
+        CLIENT_INFO = c;
+    }
 
-    public static String createKey(String auth) {
-        StringBuilder sb = new StringBuilder(auth.length());
-        for (char c : auth.toCharArray()) {
-            int idx = CHARS.indexOf(c);
-            sb.append(idx >= 0 ? CHARS.charAt((idx + 42) % 62) : c);
+    // ─── key derivation ───────────────────────────────────────────────────────
+
+    /** passphrase: rearrange 4 chunks, then shift each char +9 in a-z */
+    public static String passphrase(String auth) {
+        if (auth.length() != 32) throw new IllegalArgumentException("auth must be 32 chars");
+        String c0 = auth.substring(0, 8), c1 = auth.substring(8, 16);
+        String c2 = auth.substring(16, 24), c3 = auth.substring(24, 32);
+        String rearranged = c2 + c0 + c3 + c1;
+        StringBuilder sb = new StringBuilder(32);
+        for (char c : rearranged.toCharArray()) {
+            sb.append((char) (((c - 'a' + 9) % 26) + 'a'));
         }
         return sb.toString();
     }
 
+    /** decode_auth: self-inverse substitution for lower/upper/digit */
+    public static String decodeAuth(String auth) {
+        StringBuilder sb = new StringBuilder(auth.length());
+        for (char c : auth.toCharArray()) {
+            if (c >= 'a' && c <= 'z')      sb.append((char) (((32 - (c - 'a')) % 26) + 'a'));
+            else if (c >= 'A' && c <= 'Z') sb.append((char) (((29 - (c - 'A')) % 26) + 'A'));
+            else if (c >= '0' && c <= '9') sb.append((char) (((13 - (c - '0')) % 10) + '0'));
+            else sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    // ─── AES encrypt/decrypt ──────────────────────────────────────────────────
+
     public static String encrypt(String auth, String data) throws Exception {
-        byte[] key = createKey(auth).getBytes("UTF-8");
-        byte[] iv  = Arrays.copyOfRange(key, 0, 16);
-        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
-        byte[] enc = cipher.doFinal(data.getBytes("UTF-8"));
-        return Base64.encodeToString(enc, Base64.NO_WRAP);
+        byte[] key = passphrase(auth).getBytes("UTF-8");
+        byte[] iv  = new byte[16]; // zero IV
+        Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
+        return Base64.encodeToString(c.doFinal(data.getBytes("UTF-8")), Base64.NO_WRAP);
     }
 
     public static String decrypt(String auth, String encData) throws Exception {
-        String result = tryAllDecryptions(auth, encData, null);
-        if (result != null) return result;
-        throw new Exception("decrypt failed for all variants");
+        byte[] key = passphrase(auth).getBytes("UTF-8");
+        byte[] iv  = new byte[16];
+        byte[] ct  = Base64.decode(encData, Base64.DEFAULT);
+        Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
+        return new String(c.doFinal(ct), "UTF-8");
     }
 
-    static String tryAllDecryptions(String auth, String encData, Context ctx) {
-        byte[] ciphertext;
-        try { ciphertext = Base64.decode(encData.trim(), Base64.DEFAULT); }
-        catch (Exception e) { return null; }
+    // ─── RSA ─────────────────────────────────────────────────────────────────
 
-        // ─ همه key های ممکن ─
-        byte[][] keys = buildKeyVariants(auth);
+    public static KeyPair generateKeyPair() throws Exception {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(1024);
+        return kpg.generateKeyPair();
+    }
 
-        for (byte[] key : keys) {
-            if (key == null || (key.length != 16 && key.length != 24 && key.length != 32)) continue;
-
-            // IV ثابت = 16 بایت اول کلید
-            String r = tryPKCS5(key, Arrays.copyOfRange(key, 0, 16), ciphertext, ctx, "fixedIV");
-            if (r != null) return r;
-
-            // IV از 16 بایت اول سیفرتکست
-            if (ciphertext.length > 16) {
-                r = tryPKCS5(key, Arrays.copyOfRange(ciphertext, 0, 16),
-                    Arrays.copyOfRange(ciphertext, 16, ciphertext.length), ctx, "prependIV");
-                if (r != null) return r;
-            }
-
-            // IV صفر
-            r = tryPKCS5(key, new byte[16], ciphertext, ctx, "zeroIV");
-            if (r != null) return r;
-
-            // NoPadding — برای padding غیر استاندارد
-            r = tryNoPadding(key, Arrays.copyOfRange(key, 0, 16), ciphertext, ctx, "noPad-fixedIV");
-            if (r != null) return r;
-            r = tryNoPadding(key, new byte[16], ciphertext, ctx, "noPad-zeroIV");
-            if (r != null) return r;
+    /** Export RSA public key as PKCS#1 PEM (not X.509 SPKI) */
+    public static String exportPublicKeyPem(PublicKey pub) throws Exception {
+        RSAPublicKey rsa = (RSAPublicKey) pub;
+        byte[] pkcs1 = buildPKCS1PublicKey(rsa.getModulus(), rsa.getPublicExponent());
+        String b64 = Base64.encodeToString(pkcs1, Base64.NO_WRAP);
+        // Chunk into 64-char lines like OpenSSL PEM
+        StringBuilder pem = new StringBuilder("-----BEGIN RSA PUBLIC KEY-----\n");
+        for (int i = 0; i < b64.length(); i += 64) {
+            pem.append(b64, i, Math.min(i + 64, b64.length())).append('\n');
         }
-
-        if (ctx != null) ApiLogger.log(ctx, "RUBIKA_DEC_FAIL",
-            "auth8=" + auth.substring(0, Math.min(8, auth.length()))
-            + " cipherLen=" + ciphertext.length
-            + " allVariantsFailed");
-        return null;
+        pem.append("-----END RSA PUBLIC KEY-----\n");
+        return pem.toString();
     }
 
-    private static byte[][] buildKeyVariants(String auth) {
-        try {
-            byte[] ck32 = createKey(auth).getBytes("UTF-8");                        // createKey 32B
-            byte[] ck16 = Arrays.copyOfRange(ck32, 0, 16);                          // createKey 16B
-            byte[] ck24 = Arrays.copyOfRange(ck32, 0, 24);                          // createKey 24B
-            byte[] raw32 = auth.getBytes("UTF-8");                                  // raw 32B
-            byte[] raw16 = Arrays.copyOfRange(raw32, 0, 16);                        // raw 16B
+    private static byte[] buildPKCS1PublicKey(BigInteger modulus, BigInteger exponent) throws Exception {
+        byte[] mod = toUnsignedByteArray(modulus);
+        byte[] exp = toUnsignedByteArray(exponent);
+        ByteArrayOutputStream inner = new ByteArrayOutputStream();
+        writeDerInteger(inner, mod);
+        writeDerInteger(inner, exp);
+        byte[] seq = inner.toByteArray();
+        ByteArrayOutputStream outer = new ByteArrayOutputStream();
+        outer.write(0x30); // SEQUENCE
+        writeDerLength(outer, seq.length);
+        outer.write(seq);
+        return outer.toByteArray();
+    }
 
-            // double-createKey
-            byte[] dck32 = createKey(createKey(auth)).getBytes("UTF-8");            // double 32B
-            byte[] dck16 = Arrays.copyOfRange(dck32, 0, 16);
+    private static byte[] toUnsignedByteArray(BigInteger n) {
+        byte[] b = n.toByteArray();
+        if (b[0] == 0 && b.length > 1) return Arrays.copyOfRange(b, 1, b.length);
+        return b;
+    }
 
-            // MD5(auth) = 16B
-            MessageDigest md5 = MessageDigest.getInstance("MD5");
-            byte[] md5raw = md5.digest(auth.getBytes("UTF-8"));                     // MD5 raw
-            byte[] md5ck  = md5.digest(createKey(auth).getBytes("UTF-8"));          // MD5 createKey
+    private static void writeDerInteger(OutputStream os, byte[] val) throws IOException {
+        os.write(0x02); // INTEGER tag
+        // If high bit set, prepend 0x00
+        boolean needPad = (val[0] & 0x80) != 0;
+        int len = val.length + (needPad ? 1 : 0);
+        writeDerLength(os, len);
+        if (needPad) os.write(0x00);
+        os.write(val);
+    }
 
-            // SHA-256(auth) = 32B
-            MessageDigest sha = MessageDigest.getInstance("SHA-256");
-            byte[] sha256raw = sha.digest(auth.getBytes("UTF-8"));                  // SHA-256 raw
-            byte[] sha256ck  = sha.digest(createKey(auth).getBytes("UTF-8"));       // SHA-256 createKey
-            byte[] sha256raw16 = Arrays.copyOfRange(sha256raw, 0, 16);
-            byte[] sha256ck16  = Arrays.copyOfRange(sha256ck, 0, 16);
-
-            // SHA-1(auth) = 20B → ناسازگار با AES، برش به 16B
-            MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
-            byte[] sha1raw16 = Arrays.copyOfRange(sha1.digest(auth.getBytes("UTF-8")), 0, 16);
-            byte[] sha1ck16  = Arrays.copyOfRange(sha1.digest(createKey(auth).getBytes("UTF-8")), 0, 16);
-
-            return new byte[][] {
-                ck32, ck24, ck16,
-                raw32, raw16,
-                dck32, dck16,
-                md5raw, md5ck,
-                sha256raw, sha256ck, sha256raw16, sha256ck16,
-                sha1raw16, sha1ck16
-            };
-        } catch (Exception e) {
-            return new byte[0][];
+    private static void writeDerLength(OutputStream os, int len) throws IOException {
+        if (len < 128) {
+            os.write(len);
+        } else if (len < 256) {
+            os.write(0x81); os.write(len);
+        } else {
+            os.write(0x82); os.write((len >> 8) & 0xFF); os.write(len & 0xFF);
         }
     }
 
-    private static String tryPKCS5(byte[] key, byte[] iv, byte[] enc, Context ctx, String label) {
-        if (iv.length != 16) return null;
-        try {
-            Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
-            String result = new String(c.doFinal(enc), "UTF-8").trim();
-            if (result.startsWith("{") || result.startsWith("[")) {
-                if (ctx != null) ApiLogger.log(ctx, "RUBIKA_DEC_OK",
-                    label + " keyLen=" + key.length + " -> " + result.substring(0, Math.min(80, result.length())));
-                return result;
-            }
-        } catch (Exception ignored) {}
-        return null;
+    /** RSA-OAEP decrypt (SHA-1) to get real auth from signIn response */
+    public static String decryptRSAOAEP(PrivateKey privateKey, String encData) throws Exception {
+        byte[] enc = Base64.decode(encData, Base64.DEFAULT);
+        Cipher c = Cipher.getInstance("RSA/ECB/OAEPWithSHA-1AndMGF1Padding");
+        c.init(Cipher.DECRYPT_MODE, privateKey);
+        return new String(c.doFinal(enc), "UTF-8");
     }
 
-    private static String tryNoPadding(byte[] key, byte[] iv, byte[] enc, Context ctx, String label) {
-        if (iv.length != 16 || enc.length % 16 != 0) return null;
-        try {
-            Cipher c = Cipher.getInstance("AES/CBC/NoPadding");
-            c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
-            byte[] raw = c.doFinal(enc);
-            // بررسی اینکه آیا با { شروع میشه
-            if (raw.length > 0 && raw[0] == 0x7B) { // '{'
-                String result = new String(raw, "UTF-8").trim();
-                // trim padding bytes از انتها
-                int end = result.lastIndexOf('}');
-                if (end > 0) result = result.substring(0, end + 1);
-                if (ctx != null) ApiLogger.log(ctx, "RUBIKA_DEC_OK",
-                    "NoPad-" + label + " keyLen=" + key.length + " -> " + result.substring(0, Math.min(80, result.length())));
-                return result;
-            }
-        } catch (Exception ignored) {}
-        return null;
+    /** RSA PKCS1v15 SHA256 sign for authenticated calls */
+    public static String signData(PrivateKey privateKey, String data) throws Exception {
+        Signature sig = Signature.getInstance("SHA256withRSA");
+        sig.initSign(privateKey);
+        sig.update(data.getBytes("UTF-8"));
+        return Base64.encodeToString(sig.sign(), Base64.NO_WRAP);
     }
+
+    // ─── auth helpers ─────────────────────────────────────────────────────────
 
     public static String randomAuth() {
-        String chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+        String chars = "abcdefghijklmnopqrstuvwxyz";
         SecureRandom rand = new SecureRandom();
         StringBuilder sb = new StringBuilder(32);
         for (int i = 0; i < 32; i++) sb.append(chars.charAt(rand.nextInt(chars.length())));
@@ -173,25 +172,45 @@ public class RubikaClient {
         return "https://messengerg2c" + (1 + (int)(Math.random() * 23)) + ".iranlms.ir/";
     }
 
-    public static JSONObject callApi(Context ctx, String auth, String method,
-                                     JSONObject params) throws Exception {
-        JSONObject requestData = new JSONObject();
-        requestData.put("method", method);
-        requestData.put("data", params);
+    // ─── API call ─────────────────────────────────────────────────────────────
 
-        String encrypted = encrypt(auth, requestData.toString());
+    /**
+     * Send API request.
+     * @param auth      the user's session auth (32 chars)
+     * @param tmpSession true for unauthenticated calls (sendCode, signIn); false for authenticated
+     * @param method    API method name
+     * @param input     inner input params
+     * @param privateKey RSA private key for signing authenticated calls (null for tmp_session calls)
+     */
+    public static JSONObject callApi(Context ctx, String auth, boolean tmpSession,
+                                     String method, JSONObject input,
+                                     PrivateKey privateKey) throws Exception {
+        // Build inner encrypted payload
+        JSONObject innerData = new JSONObject();
+        innerData.put("client", CLIENT_INFO);
+        innerData.put("method", method);
+        innerData.put("input", input);
 
+        String dataEnc = encrypt(auth, innerData.toString());
+
+        // Build outer request body
         JSONObject body = new JSONObject();
         body.put("api_version", "6");
-        body.put("auth", auth);
-        body.put("data_enc", encrypted);
+        if (tmpSession) {
+            body.put("tmp_session", auth);
+        } else {
+            body.put("auth", decodeAuth(auth));
+            if (privateKey != null) {
+                body.put("sign", signData(privateKey, dataEnc));
+            }
+        }
+        body.put("data_enc", dataEnc);
 
         URL url = new URL(getEndpoint());
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("client-type", "android_c");
-        conn.setRequestProperty("client-version", "3.11");
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        conn.setRequestProperty("User-Agent", "okhttp/3.12.1");
         conn.setDoOutput(true);
         conn.setConnectTimeout(15000);
         conn.setReadTimeout(15000);
@@ -212,22 +231,20 @@ public class RubikaClient {
 
         String raw = sb.toString();
         if (ctx != null) {
-            // auth اول ۸ کاراکترش لاگ میشه برای debug
             ApiLogger.log(ctx, "RUBIKA_RAW",
-                method + " auth=" + auth.substring(0, 8) + "... -> " + code
-                + ": " + raw.substring(0, Math.min(300, raw.length())));
+                method + " -> " + code + ": " + raw.substring(0, Math.min(300, raw.length())));
         }
 
         JSONObject resp = new JSONObject(raw);
         if (resp.has("data_enc")) {
-            String encData = resp.getString("data_enc");
-            String dec = tryAllDecryptions(auth, encData, ctx);
-            if (dec != null) {
-                try { return new JSONObject(dec); } catch (Exception ignored) {}
+            try {
+                String dec = decrypt(auth, resp.getString("data_enc"));
+                if (ctx != null) ApiLogger.log(ctx, "RUBIKA_DEC", dec.substring(0, Math.min(150, dec.length())));
+                return new JSONObject(dec);
+            } catch (Exception e) {
+                if (ctx != null) ApiLogger.log(ctx, "RUBIKA_DEC_FAIL", e.getMessage()
+                    + " auth=" + auth + " enc=" + resp.getString("data_enc").substring(0, 40));
             }
-            if (ctx != null) ApiLogger.log(ctx, "RUBIKA_DEC_FAIL",
-                "auth=" + auth + " enc=" + encData);
-            return resp;
         }
         return resp;
     }
@@ -235,46 +252,55 @@ public class RubikaClient {
     // ─── Authentication ───────────────────────────────────────────────────────
 
     public static JSONObject sendCode(Context ctx, String phone, String tmpAuth) throws Exception {
-        JSONObject params = new JSONObject();
-        params.put("phone_number", phone);
-        params.put("send_type", "SMS");
-        return callApi(ctx, tmpAuth, "sendCode", params);
+        JSONObject input = new JSONObject();
+        input.put("phone_number", phone);
+        input.put("send_type", "SMS");
+        return callApi(ctx, tmpAuth, true, "sendCode", input, null);
     }
 
+    /**
+     * signIn — includes RSA public key so server can encrypt the real auth with it.
+     * Returns raw JSON; caller must RSA-decrypt result["data"]["auth"] for real auth.
+     */
     public static JSONObject signIn(Context ctx, String tmpAuth, String phone,
-                                    String hash, String otp) throws Exception {
-        JSONObject params = new JSONObject();
-        params.put("phone_number", phone);
-        params.put("phone_code_hash", hash);
-        params.put("phone_code", otp);
-        return callApi(ctx, tmpAuth, "signIn", params);
+                                    String hash, String otp, String publicKeyPem) throws Exception {
+        JSONObject input = new JSONObject();
+        input.put("phone_number", phone);
+        input.put("phone_code_hash", hash);
+        input.put("phone_code", otp);
+        if (publicKeyPem != null && !publicKeyPem.isEmpty()) {
+            // encode public key as rubpy does: decode_auth(base64(pem_bytes))
+            String b64Pem = Base64.encodeToString(publicKeyPem.getBytes("UTF-8"), Base64.NO_WRAP);
+            input.put("public_key", decodeAuth(b64Pem));
+        }
+        return callApi(ctx, tmpAuth, true, "signIn", input, null);
     }
 
-    // ─── Chats & Messages ─────────────────────────────────────────────────────
+    // ─── Authenticated calls ──────────────────────────────────────────────────
 
-    public static JSONObject getChats(Context ctx, String auth) throws Exception {
-        JSONObject params = new JSONObject();
-        params.put("start_id", JSONObject.NULL);
-        return callApi(ctx, auth, "getChats", params);
+    public static JSONObject getChats(Context ctx, String auth, PrivateKey pk) throws Exception {
+        JSONObject input = new JSONObject();
+        input.put("start_id", JSONObject.NULL);
+        return callApi(ctx, auth, false, "getChats", input, pk);
     }
 
-    public static JSONObject getMessages(Context ctx, String auth, String guid,
-                                         long minId) throws Exception {
-        JSONObject params = new JSONObject();
-        params.put("object_guid", guid);
-        params.put("min_id", minId);
-        params.put("limit", 20);
-        params.put("sort", "FromMin");
-        return callApi(ctx, auth, "getMessages", params);
+    public static JSONObject getMessages(Context ctx, String auth, PrivateKey pk,
+                                         String guid, long minId) throws Exception {
+        JSONObject input = new JSONObject();
+        input.put("object_guid", guid);
+        input.put("min_id", minId);
+        input.put("limit", 20);
+        input.put("sort", "FromMin");
+        return callApi(ctx, auth, false, "getMessages", input, pk);
     }
 
-    public static JSONObject sendMessage(Context ctx, String auth, String guid,
-                                         String text, long replyToId) throws Exception {
-        JSONObject params = new JSONObject();
-        params.put("object_guid", guid);
-        params.put("text", text);
-        params.put("rnd", (long)(Math.random() * 2_147_483_647L));
-        if (replyToId > 0) params.put("reply_to_message_id", replyToId);
-        return callApi(ctx, auth, "sendMessage", params);
+    public static JSONObject sendMessage(Context ctx, String auth, PrivateKey pk,
+                                          String guid, String text, long replyToId) throws Exception {
+        JSONObject input = new JSONObject();
+        input.put("object_guid", guid);
+        input.put("text", text);
+        input.put("rnd", (long)(Math.random() * 2_147_483_647L));
+        if (replyToId > 0) input.put("reply_to_message_id", replyToId);
+        return callApi(ctx, auth, false, "sendMessage", input, pk);
     }
 }

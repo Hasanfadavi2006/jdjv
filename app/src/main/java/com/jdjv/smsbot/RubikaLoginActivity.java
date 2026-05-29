@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.util.Base64;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,6 +21,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.PrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -175,7 +180,7 @@ public class RubikaLoginActivity extends Activity {
         if (!existingAuth.isEmpty()) {
             authToken = existingAuth;
             statusTv.setText("قبلاً وارد شدی. در حال بارگذاری گروه‌ها...");
-            loadGroups(existingAuth);
+            loadGroups(existingAuth, loadPrivateKey());
         }
 
         sendCodeBtn.setOnClickListener(new View.OnClickListener() {
@@ -228,7 +233,6 @@ public class RubikaLoginActivity extends Activity {
                     String status = resp.optString("status", "");
                     if ("SendPassKey".equals(status) || resp.has("phone_code_hash") ||
                             "OK".equals(status) || resp.has("data")) {
-                        // ممکنه hash توی data باشه
                         if (resp.has("data")) {
                             JSONObject d = resp.optJSONObject("data");
                             if (d != null) phoneHash = d.optString("phone_code_hash", "");
@@ -272,26 +276,48 @@ public class RubikaLoginActivity extends Activity {
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
-                    JSONObject resp = RubikaClient.signIn(
-                        RubikaLoginActivity.this, tmpAuth, phone, phoneHash, otp);
+                    // Generate RSA key pair for secure auth exchange
+                    KeyPair kp = RubikaClient.generateKeyPair();
+                    String pem = RubikaClient.exportPublicKeyPem(kp.getPublic());
 
-                    // پیدا کردن auth در پاسخ
+                    // Persist private key so RubikaService can sign future requests
+                    String privKeyB64 = Base64.encodeToString(kp.getPrivate().getEncoded(), Base64.NO_WRAP);
+                    getPrefs().edit().putString("rubika_private_key", privKeyB64).apply();
+
+                    JSONObject resp = RubikaClient.signIn(
+                        RubikaLoginActivity.this, tmpAuth, phone, phoneHash, otp, pem);
+
+                    ApiLogger.log(RubikaLoginActivity.this, "RUBIKA_SIGNIN_RESP",
+                        resp.toString().substring(0, Math.min(200, resp.toString().length())));
+
+                    // Extract and RSA-OAEP decrypt real auth from server response
                     String auth = null;
                     String myGuid = null;
-                    if (resp.has("auth")) {
-                        auth = resp.getString("auth");
-                    } else if (resp.has("data")) {
+                    if (resp.has("data")) {
                         JSONObject d = resp.optJSONObject("data");
                         if (d != null) {
-                            auth = d.optString("auth", null);
+                            String encAuth = d.optString("auth", null);
+                            if (encAuth != null && !encAuth.isEmpty()) {
+                                try {
+                                    auth = RubikaClient.decryptRSAOAEP(kp.getPrivate(), encAuth);
+                                    ApiLogger.log(RubikaLoginActivity.this, "RUBIKA_AUTH_DEC",
+                                        "auth len=" + auth.length());
+                                } catch (Exception e) {
+                                    ApiLogger.log(RubikaLoginActivity.this, "RUBIKA_RSA_ERR",
+                                        e.getMessage() + " | using raw");
+                                    auth = encAuth;
+                                }
+                            }
                             JSONObject account = d.optJSONObject("account");
                             if (account != null) myGuid = account.optString("object_guid", null);
                         }
                     }
-                    if (auth == null) auth = tmpAuth; // اگه پیدا نشد از tmpAuth استفاده کن
+                    if (auth == null && resp.has("auth")) auth = resp.getString("auth");
+                    if (auth == null) auth = tmpAuth;
 
                     final String finalAuth = auth;
                     final String finalGuid = myGuid;
+                    final PrivateKey finalPk = kp.getPrivate();
 
                     getPrefs().edit()
                         .putString("rubika_auth", finalAuth)
@@ -306,7 +332,7 @@ public class RubikaLoginActivity extends Activity {
                             statusTv.setText("ورود موفق! در حال بارگذاری گروه‌ها...");
                             verifyBtn.setEnabled(true);
                             otpLayout.setVisibility(View.GONE);
-                            loadGroups(finalAuth);
+                            loadGroups(finalAuth, finalPk);
                         }
                     });
 
@@ -322,14 +348,13 @@ public class RubikaLoginActivity extends Activity {
         }).start();
     }
 
-    private void loadGroups(final String auth) {
+    private void loadGroups(final String auth, final PrivateKey pk) {
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
-                    JSONObject resp = RubikaClient.getChats(RubikaLoginActivity.this, auth);
+                    JSONObject resp = RubikaClient.getChats(RubikaLoginActivity.this, auth, pk);
                     groups.clear();
 
-                    // مشخص کردن جایی که لیست چت‌ها هست
                     JSONArray chats = null;
                     if (resp.has("data")) {
                         JSONObject d = resp.optJSONObject("data");
@@ -342,19 +367,16 @@ public class RubikaLoginActivity extends Activity {
                     if (chats != null) {
                         for (int i = 0; i < chats.length(); i++) {
                             JSONObject chat = chats.getJSONObject(i);
-                            // ممکنه chat داخل یه object دیگه باشه
                             JSONObject obj = chat.optJSONObject("object_data");
                             if (obj == null) obj = chat;
                             String guid = obj.optString("object_guid", "");
-                            String title = obj.optString("title", obj.optString("first_name", guid));
-                            // فقط گروه‌ها (g0...) یا کانال‌ها (c0...)
+                            String titleStr = obj.optString("title", obj.optString("first_name", guid));
                             if (!guid.isEmpty() && (guid.startsWith("g0") || guid.startsWith("c0"))) {
-                                groups.add(new String[]{guid, title});
+                                groups.add(new String[]{guid, titleStr});
                             }
                         }
                     }
 
-                    // بارگذاری گروه‌های ذخیره‌شده
                     String saved = getPrefs().getString("rubika_groups", "");
                     if (!saved.isEmpty()) {
                         for (String g : saved.split(",")) {
@@ -365,7 +387,7 @@ public class RubikaLoginActivity extends Activity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             if (groups.isEmpty()) {
-                                statusTv.setText("هیچ گروهی پیدا نشد. ممکنه auth نیاز به refresh داشته باشه.");
+                                statusTv.setText("هیچ گروهی پیدا نشد.");
                             } else {
                                 statusTv.setText(groups.size() + " گروه پیدا شد");
                             }
@@ -434,9 +456,20 @@ public class RubikaLoginActivity extends Activity {
         return getSharedPreferences("smsbot", Context.MODE_PRIVATE);
     }
 
+    private PrivateKey loadPrivateKey() {
+        String b64 = getPrefs().getString("rubika_private_key", "");
+        if (b64.isEmpty()) return null;
+        try {
+            byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+            return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(bytes));
+        } catch (Exception e) {
+            ApiLogger.log(this, "RUBIKA_KEY_ERR", e.getMessage());
+            return null;
+        }
+    }
+
     private void showRubikaLog() {
         String log = ApiLogger.read(this);
-        // فقط خطوط مربوط به روبیکا
         StringBuilder sb = new StringBuilder();
         for (String line : log.split("\n")) {
             if (line.contains("RUBIKA") || line.contains("rubika")) sb.append(line).append("\n");

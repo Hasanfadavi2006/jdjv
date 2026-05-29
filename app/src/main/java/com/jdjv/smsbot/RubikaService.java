@@ -5,14 +5,18 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.IBinder;
+import android.util.Base64;
 import android.util.Log;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
 
 public class RubikaService extends Service {
 
     private static final String TAG = "RubikaService";
-    private static final long POLL_INTERVAL = 30_000L; // هر ۳۰ ثانیه
+    private static final long POLL_INTERVAL = 30_000L;
     private volatile boolean running = false;
     private Thread pollThread;
 
@@ -60,20 +64,22 @@ public class RubikaService extends Service {
         if (auth.isEmpty() || groupsCsv.isEmpty()) return;
         if (!prefs.getBoolean("enabled", true)) return;
 
+        PrivateKey pk = loadPrivateKey(prefs);
+
         String[] guids = groupsCsv.split(",");
         for (String guid : guids) {
             if (guid.trim().isEmpty()) continue;
-            pollGroup(auth, guid.trim());
+            pollGroup(auth, pk, guid.trim());
         }
     }
 
-    private void pollGroup(String auth, String guid) {
+    private void pollGroup(String auth, PrivateKey pk, String guid) {
         SharedPreferences prefs = getSharedPreferences("smsbot", Context.MODE_PRIVATE);
         String lastKey = "rubika_last_" + guid;
         long lastMsgId = prefs.getLong(lastKey, 0);
 
         try {
-            JSONObject resp = RubikaClient.getMessages(this, auth, guid, lastMsgId);
+            JSONObject resp = RubikaClient.getMessages(this, auth, pk, guid, lastMsgId);
 
             JSONArray messages = null;
             if (resp.has("data")) {
@@ -92,22 +98,19 @@ public class RubikaService extends Service {
                 if (msgId <= lastMsgId) continue;
                 if (msgId > newLastId) newLastId = msgId;
 
-                // فقط پیام‌های متنی
                 String text = msg.optString("text", "").trim();
                 if (text.isEmpty()) continue;
 
-                // پیام از خودم نباشه
                 String senderGuid = msg.optString("author_object_guid",
                     msg.optString("from_object_guid", ""));
                 if (!myGuid.isEmpty() && myGuid.equals(senderGuid)) continue;
 
-                // نام فرستنده
                 String senderName = msg.optString("author_title", senderGuid);
 
                 ApiLogger.log(this, "RUBIKA_MSG", guid + " | " + senderName + ": " + text);
 
-                // ارسال به Claude
                 final String fAuth = auth;
+                final PrivateKey fPk = pk;
                 final String fGuid = guid;
                 final long fMsgId = msgId;
                 final String fText = text;
@@ -117,8 +120,8 @@ public class RubikaService extends Service {
                     new ClaudeApiClient.Callback() {
                         @Override public void onReply(String reply, double costUsd) {
                             try {
-                                RubikaClient.sendMessage(RubikaService.this, fAuth, fGuid,
-                                    reply, fMsgId);
+                                RubikaClient.sendMessage(RubikaService.this, fAuth, fPk,
+                                    fGuid, reply, fMsgId);
                                 ApiLogger.log(RubikaService.this, "RUBIKA_SENT",
                                     fGuid + " -> " + reply);
                             } catch (Exception e) {
@@ -137,6 +140,18 @@ public class RubikaService extends Service {
 
         } catch (Exception e) {
             ApiLogger.log(this, "RUBIKA_POLL_ERR", guid + ": " + e.getMessage());
+        }
+    }
+
+    private PrivateKey loadPrivateKey(SharedPreferences prefs) {
+        String b64 = prefs.getString("rubika_private_key", "");
+        if (b64.isEmpty()) return null;
+        try {
+            byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+            return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(bytes));
+        } catch (Exception e) {
+            ApiLogger.log(this, "RUBIKA_KEY_ERR", e.getMessage());
+            return null;
         }
     }
 }
