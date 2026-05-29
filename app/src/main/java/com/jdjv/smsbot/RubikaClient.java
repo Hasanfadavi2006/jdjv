@@ -34,17 +34,29 @@ public class RubikaClient {
 
     public static String encrypt(String auth, String data) throws Exception {
         byte[] key = createKey(auth).getBytes("UTF-8");
-        byte[] iv  = Arrays.copyOfRange(key, 0, 16); // IV = 16 bytes اول کلید (پروتکل روبیکا)
+        byte[] iv  = Arrays.copyOfRange(key, 0, 16);
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
         byte[] enc = cipher.doFinal(data.getBytes("UTF-8"));
         return Base64.encodeToString(enc, Base64.NO_WRAP);
     }
 
+    // decrypt با IV ثابت (16 بایت اول کلید)
     public static String decrypt(String auth, String encData) throws Exception {
         byte[] key  = createKey(auth).getBytes("UTF-8");
-        byte[] iv   = Arrays.copyOfRange(key, 0, 16); // IV = 16 bytes اول کلید
-        byte[] enc  = Base64.decode(encData, Base64.NO_WRAP);
+        byte[] iv   = Arrays.copyOfRange(key, 0, 16);
+        byte[] enc  = Base64.decode(encData, Base64.DEFAULT);
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
+        return new String(cipher.doFinal(enc), "UTF-8");
+    }
+
+    // decrypt با IV از 16 بایت اول سیفرتکست (روش جایگزین)
+    private static String decryptPrepended(String auth, String encData) throws Exception {
+        byte[] key  = createKey(auth).getBytes("UTF-8");
+        byte[] data = Base64.decode(encData, Base64.DEFAULT);
+        byte[] iv   = Arrays.copyOfRange(data, 0, 16);
+        byte[] enc  = Arrays.copyOfRange(data, 16, data.length);
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
         return new String(cipher.doFinal(enc), "UTF-8");
@@ -107,8 +119,21 @@ public class RubikaClient {
 
         JSONObject resp = new JSONObject(raw);
         if (resp.has("data_enc")) {
-            String dec = decrypt(auth, resp.getString("data_enc"));
-            return new JSONObject(dec);
+            String encData = resp.getString("data_enc");
+            // روش ۱: IV ثابت (16 بایت اول کلید)
+            try {
+                return new JSONObject(decrypt(auth, encData));
+            } catch (Exception e1) {
+                // روش ۲: IV از 16 بایت اول سیفرتکست
+                try {
+                    return new JSONObject(decryptPrepended(auth, encData));
+                } catch (Exception e2) {
+                    if (ctx != null) ApiLogger.log(ctx, "RUBIKA_DEC",
+                        "fixedIV=" + e1.getMessage() + " | prependIV=" + e2.getMessage()
+                        + " | raw=" + raw.substring(0, Math.min(200, raw.length())));
+                    return resp; // برگردوندن raw — caller خودش handle می‌کنه
+                }
+            }
         }
         return resp;
     }

@@ -147,6 +147,19 @@ public class RubikaLoginActivity extends Activity {
         groupList.setLayoutParams(glp);
         groupLayout.addView(groupList);
 
+        Button showLogBtn = new Button(this);
+        showLogBtn.setText("نمایش لاگ روبیکا");
+        showLogBtn.setBackgroundColor(Color.parseColor("#263238"));
+        showLogBtn.setTextColor(Color.parseColor("#80CBC4"));
+        LinearLayout.LayoutParams slbp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        slbp.setMargins(0, 8, 0, 0);
+        showLogBtn.setLayoutParams(slbp);
+        showLogBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { showRubikaLog(); }
+        });
+        root.addView(showLogBtn);
+
         Button saveGroupsBtn = new Button(this);
         saveGroupsBtn.setText("ذخیره و شروع سرویس");
         saveGroupsBtn.setBackgroundColor(Color.parseColor("#E65100"));
@@ -419,6 +432,38 @@ public class RubikaLoginActivity extends Activity {
 
     private SharedPreferences getPrefs() {
         return getSharedPreferences("smsbot", Context.MODE_PRIVATE);
+    }
+
+    private void showRubikaLog() {
+        String log = ApiLogger.read(this);
+        // فقط خطوط مربوط به روبیکا
+        StringBuilder sb = new StringBuilder();
+        for (String line : log.split("\n")) {
+            if (line.contains("RUBIKA") || line.contains("rubika")) sb.append(line).append("\n");
+        }
+        String filtered = sb.length() > 0 ? sb.toString() : log;
+
+        android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(this);
+        b.setTitle("لاگ روبیکا");
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.setPadding(16, 8, 16, 8);
+        final TextView tv = new TextView(this);
+        tv.setTextColor(Color.parseColor("#80CBC4"));
+        tv.setTextSize(8);
+        tv.setTypeface(android.graphics.Typeface.MONOSPACE);
+        tv.setText(filtered.isEmpty() ? "لاگی موجود نیست." : filtered);
+        sv.addView(tv);
+        b.setView(sv);
+        b.setPositiveButton("کپی", new android.content.DialogInterface.OnClickListener() {
+            @Override public void onClick(android.content.DialogInterface d, int w) {
+                android.content.ClipboardManager cm =
+                    (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("log", tv.getText()));
+                Toast.makeText(RubikaLoginActivity.this, "کپی شد", Toast.LENGTH_SHORT).show();
+            }
+        });
+        b.setNeutralButton("بستن", null);
+        b.show();
     }
 
     private static String normalizePhone(String phone) {
