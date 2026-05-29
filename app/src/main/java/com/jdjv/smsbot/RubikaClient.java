@@ -14,6 +14,7 @@ import java.security.*;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.*;
 import java.util.Arrays;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
@@ -290,29 +291,56 @@ public class RubikaClient {
         return callApi(ctx, auth, false, "registerDevice", input, pk);
     }
 
-    /** Get group title — returns null on failure */
-    public static String getGroupTitle(Context ctx, String auth, PrivateKey pk, String guid) {
+    /** Get display title for any chat type (group/channel/user). Returns null on failure. */
+    public static String getObjectTitle(Context ctx, String auth, PrivateKey pk, String guid) {
         try {
             JSONObject input = new JSONObject();
-            String method;
-            String dataKey;
+            String method, dataKey, subKey;
             if (guid.startsWith("g0")) {
                 input.put("group_guid", guid);
-                method = "getGroupInfo";
-                dataKey = "group";
-            } else {
+                method = "getGroupInfo"; dataKey = "group"; subKey = "title";
+            } else if (guid.startsWith("c0")) {
                 input.put("channel_guid", guid);
-                method = "getChannelInfo";
-                dataKey = "channel";
+                method = "getChannelInfo"; dataKey = "channel"; subKey = "title";
+            } else {
+                // u0, s0, etc. — private/bot chats
+                input.put("user_guid", guid);
+                method = "getUserInfo"; dataKey = "user"; subKey = null;
             }
             JSONObject resp = callApi(ctx, auth, false, method, input, pk);
             JSONObject d = resp.optJSONObject("data");
             if (d != null) {
                 JSONObject obj = d.optJSONObject(dataKey);
-                if (obj != null) return obj.optString("title", null);
+                if (obj != null) {
+                    if (subKey != null) return obj.optString(subKey, null);
+                    // user: first_name + last_name
+                    String fn = obj.optString("first_name", "").trim();
+                    String ln = obj.optString("last_name", "").trim();
+                    String name = (fn + " " + ln).trim();
+                    return name.isEmpty() ? obj.optString("username", null) : name;
+                }
             }
         } catch (Exception ignored) {}
         return null;
+    }
+
+    /** Forward a message (any type: text/image/video/voice/file) to another chat. */
+    public static JSONObject forwardMessages(Context ctx, String auth, PrivateKey pk,
+                                              String fromGuid, String messageId,
+                                              String toGuid) throws Exception {
+        JSONObject input = new JSONObject();
+        input.put("from_object_guid", fromGuid);
+        JSONArray ids = new JSONArray();
+        ids.put(messageId);
+        input.put("message_ids", ids);
+        input.put("to_object_guid", toGuid);
+        input.put("rnd", (long)(Math.random() * 2_147_483_647L));
+        return callApi(ctx, auth, false, "forwardMessages", input, pk);
+    }
+
+    /** @deprecated use getObjectTitle */
+    public static String getGroupTitle(Context ctx, String auth, PrivateKey pk, String guid) {
+        return getObjectTitle(ctx, auth, pk, guid);
     }
 
     public static JSONObject getChats(Context ctx, String auth, PrivateKey pk) throws Exception {

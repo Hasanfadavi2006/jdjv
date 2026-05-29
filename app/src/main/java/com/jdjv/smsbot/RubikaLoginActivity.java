@@ -16,6 +16,7 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.RadioButton;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -38,15 +39,20 @@ public class RubikaLoginActivity extends Activity {
     private Button verifyBtn;
     private TextView statusTv;
     private LinearLayout otpLayout;
-    private LinearLayout groupLayout;
-    private ListView groupList;
+    private LinearLayout chatLayout;
+    private ListView monitorList;   // checkboxes — which chats to watch
+    private ListView forwardList;   // radio — where to forward
 
     private String tmpAuth;
     private String phoneHash;
     private String authToken;
 
-    private final List<String[]> groups = new ArrayList<>(); // [guid, title]
-    private final Set<String> selectedGuids = new HashSet<>();
+    // [guid, displayName]
+    private final List<String[]> chats = new ArrayList<>();
+    // GUIDs to monitor (default: all). Empty = none selected yet.
+    private final Set<String> monitoredGuids = new HashSet<>();
+    // Single destination for forwarding; empty = disabled
+    private String forwardToGuid = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -133,54 +139,79 @@ public class RubikaLoginActivity extends Activity {
         verifyBtn.setLayoutParams(vbp);
         otpLayout.addView(verifyBtn);
 
-        // ─ انتخاب گروه‌ها ─
-        groupLayout = new LinearLayout(this);
-        groupLayout.setOrientation(LinearLayout.VERTICAL);
-        groupLayout.setVisibility(View.GONE);
-        root.addView(groupLayout);
+        // ─ بخش انتخاب چت‌ها ─
+        chatLayout = new LinearLayout(this);
+        chatLayout.setOrientation(LinearLayout.VERTICAL);
+        chatLayout.setVisibility(View.GONE);
+        root.addView(chatLayout);
 
-        TextView groupLabel = new TextView(this);
-        groupLabel.setText("گروه‌هایی که باید مانیتور شوند:");
-        groupLabel.setTextColor(Color.parseColor("#90CAF9"));
-        groupLabel.setPadding(0, 20, 0, 8);
-        groupLayout.addView(groupLabel);
+        // -- مانیتور --
+        TextView monitorLabel = new TextView(this);
+        monitorLabel.setText("کدام چت‌ها مانیتور شوند؟ (دیفالت: همه)");
+        monitorLabel.setTextColor(Color.parseColor("#90CAF9"));
+        monitorLabel.setPadding(0, 20, 0, 8);
+        chatLayout.addView(monitorLabel);
 
-        groupList = new ListView(this);
-        groupList.setBackgroundColor(Color.parseColor("#1A1A1A"));
-        LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(
+        monitorList = new ListView(this);
+        monitorList.setBackgroundColor(Color.parseColor("#1A1A1A"));
+        LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, 600);
-        groupList.setLayoutParams(glp);
-        groupLayout.addView(groupList);
+        monitorList.setLayoutParams(mlp);
+        chatLayout.addView(monitorList);
 
+        // -- فوروارد --
+        TextView forwardLabel = new TextView(this);
+        forwardLabel.setText("پیام‌ها را به کجا فوروارد کنم؟ (اختیاری)");
+        forwardLabel.setTextColor(Color.parseColor("#FFCC02"));
+        forwardLabel.setPadding(0, 20, 0, 8);
+        chatLayout.addView(forwardLabel);
+
+        TextView forwardHint = new TextView(this);
+        forwardHint.setText("یکی انتخاب کن — همه پیام‌های چت‌های انتخابی اونجا فوروارد می‌شن (متن، عکس، ویدیو، ویس)");
+        forwardHint.setTextColor(Color.GRAY);
+        forwardHint.setTextSize(11);
+        forwardHint.setPadding(0, 0, 0, 6);
+        chatLayout.addView(forwardHint);
+
+        forwardList = new ListView(this);
+        forwardList.setBackgroundColor(Color.parseColor("#1A1A1A"));
+        LinearLayout.LayoutParams flp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 400);
+        forwardList.setLayoutParams(flp);
+        chatLayout.addView(forwardList);
+
+        // -- لاگ --
         Button showLogBtn = new Button(this);
         showLogBtn.setText("نمایش لاگ روبیکا");
         showLogBtn.setBackgroundColor(Color.parseColor("#263238"));
         showLogBtn.setTextColor(Color.parseColor("#80CBC4"));
         LinearLayout.LayoutParams slbp = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        slbp.setMargins(0, 8, 0, 0);
+        slbp.setMargins(0, 12, 0, 0);
         showLogBtn.setLayoutParams(slbp);
         showLogBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { showRubikaLog(); }
         });
-        root.addView(showLogBtn);
+        chatLayout.addView(showLogBtn);
 
-        Button saveGroupsBtn = new Button(this);
-        saveGroupsBtn.setText("ذخیره و شروع سرویس");
-        saveGroupsBtn.setBackgroundColor(Color.parseColor("#E65100"));
-        saveGroupsBtn.setTextColor(Color.WHITE);
-        LinearLayout.LayoutParams sgbp = new LinearLayout.LayoutParams(
+        // -- ذخیره --
+        Button saveBtn = new Button(this);
+        saveBtn.setText("ذخیره و شروع سرویس");
+        saveBtn.setBackgroundColor(Color.parseColor("#E65100"));
+        saveBtn.setTextColor(Color.WHITE);
+        LinearLayout.LayoutParams sbp = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        sgbp.setMargins(0, 8, 0, 0);
-        saveGroupsBtn.setLayoutParams(sgbp);
-        groupLayout.addView(saveGroupsBtn);
+        sbp.setMargins(0, 8, 0, 0);
+        saveBtn.setLayoutParams(sbp);
+        chatLayout.addView(saveBtn);
 
         // ─ اگه قبلاً لاگین شده ─
         String existingAuth = getPrefs().getString("rubika_auth", "");
         if (!existingAuth.isEmpty()) {
             authToken = existingAuth;
-            statusTv.setText("قبلاً وارد شدی. در حال بارگذاری گروه‌ها...");
-            loadGroups(existingAuth, loadPrivateKey());
+            forwardToGuid = getPrefs().getString("rubika_forward_to", "");
+            statusTv.setText("قبلاً وارد شدی. در حال بارگذاری چت‌ها...");
+            loadChats(existingAuth, loadPrivateKey());
         }
 
         sendCodeBtn.setOnClickListener(new View.OnClickListener() {
@@ -207,13 +238,13 @@ public class RubikaLoginActivity extends Activity {
             }
         });
 
-        saveGroupsBtn.setOnClickListener(new View.OnClickListener() {
+        saveBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                if (selectedGuids.isEmpty()) {
-                    Toast.makeText(RubikaLoginActivity.this, "حداقل یک گروه انتخاب کنید", Toast.LENGTH_SHORT).show();
+                if (monitoredGuids.isEmpty()) {
+                    Toast.makeText(RubikaLoginActivity.this, "حداقل یک چت انتخاب کنید", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                saveSelectedGroups();
+                saveSelections();
                 startRubikaService();
                 Toast.makeText(RubikaLoginActivity.this, "سرویس روبیکا شروع شد", Toast.LENGTH_SHORT).show();
                 finish();
@@ -231,15 +262,13 @@ public class RubikaLoginActivity extends Activity {
                 try {
                     JSONObject resp = RubikaClient.sendCode(RubikaLoginActivity.this, phone, tmpAuth);
                     String status = resp.optString("status", "");
-                    if ("SendPassKey".equals(status) || resp.has("phone_code_hash") ||
-                            "OK".equals(status) || resp.has("data")) {
+                    if ("OK".equals(status) || resp.has("data")) {
                         if (resp.has("data")) {
                             JSONObject d = resp.optJSONObject("data");
                             if (d != null) phoneHash = d.optString("phone_code_hash", "");
                         }
-                        if (phoneHash == null || phoneHash.isEmpty()) {
+                        if (phoneHash == null || phoneHash.isEmpty())
                             phoneHash = resp.optString("phone_code_hash", "nohash");
-                        }
                         runOnUiThread(new Runnable() {
                             @Override public void run() {
                                 statusTv.setText("کد به شماره ارسال شد.");
@@ -276,11 +305,9 @@ public class RubikaLoginActivity extends Activity {
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
-                    // Generate RSA key pair for secure auth exchange
                     KeyPair kp = RubikaClient.generateKeyPair();
                     String pem = RubikaClient.exportPublicKeyPem(kp.getPublic());
 
-                    // Persist private key so RubikaService can sign future requests
                     String privKeyB64 = Base64.encodeToString(kp.getPrivate().getEncoded(), Base64.NO_WRAP);
                     getPrefs().edit().putString("rubika_private_key", privKeyB64).apply();
 
@@ -290,7 +317,6 @@ public class RubikaLoginActivity extends Activity {
                     ApiLogger.log(RubikaLoginActivity.this, "RUBIKA_SIGNIN_RESP",
                         resp.toString().substring(0, Math.min(200, resp.toString().length())));
 
-                    // Extract and RSA-OAEP decrypt real auth from server response
                     String auth = null;
                     String myGuid = null;
                     if (resp.has("data")) {
@@ -327,7 +353,6 @@ public class RubikaLoginActivity extends Activity {
 
                     authToken = finalAuth;
 
-                    // Must registerDevice to activate session before any authenticated calls
                     try {
                         JSONObject regResp = RubikaClient.registerDevice(
                             RubikaLoginActivity.this, finalAuth, finalPk);
@@ -339,10 +364,10 @@ public class RubikaLoginActivity extends Activity {
 
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            statusTv.setText("ورود موفق! در حال بارگذاری گروه‌ها...");
+                            statusTv.setText("ورود موفق! در حال بارگذاری چت‌ها...");
                             verifyBtn.setEnabled(true);
                             otpLayout.setVisibility(View.GONE);
-                            loadGroups(finalAuth, finalPk);
+                            loadChats(finalAuth, finalPk);
                         }
                     });
 
@@ -358,69 +383,64 @@ public class RubikaLoginActivity extends Activity {
         }).start();
     }
 
-    private void loadGroups(final String auth, final PrivateKey pk) {
+    private void loadChats(final String auth, final PrivateKey pk) {
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
                     JSONObject resp = RubikaClient.getChats(RubikaLoginActivity.this, auth, pk);
-                    groups.clear();
+                    chats.clear();
 
-                    JSONArray chats = null;
+                    JSONArray list = null;
                     if (resp.has("data")) {
                         JSONObject d = resp.optJSONObject("data");
-                        if (d != null) chats = d.optJSONArray("chat_updates");
-                        if (chats == null && d != null) chats = d.optJSONArray("chats");
-                    }
-                    if (chats == null) chats = resp.optJSONArray("chats");
-                    if (chats == null) chats = resp.optJSONArray("chat_updates");
-
-                    if (chats != null) {
-                        // Log first chat raw to see field structure
-                        if (chats.length() > 0) {
-                            ApiLogger.log(RubikaLoginActivity.this, "RUBIKA_CHAT0",
-                                chats.getJSONObject(0).toString().substring(0,
-                                    Math.min(300, chats.getJSONObject(0).toString().length())));
+                        if (d != null) {
+                            list = d.optJSONArray("chats");
+                            if (list == null) list = d.optJSONArray("chat_updates");
                         }
-                        for (int i = 0; i < chats.length(); i++) {
-                            JSONObject chat = chats.getJSONObject(i);
+                    }
+                    if (list == null) list = resp.optJSONArray("chats");
+                    if (list == null) list = resp.optJSONArray("chat_updates");
+
+                    if (list != null) {
+                        for (int i = 0; i < list.length(); i++) {
+                            JSONObject chat = list.getJSONObject(i);
                             String guid = chat.optString("object_guid", "");
-                            if (guid.isEmpty() || (!guid.startsWith("g0") && !guid.startsWith("c0"))) continue;
-                            // Use last message text as label hint since getChats doesn't return title
-                            String hint = guid;
-                            JSONObject lm = chat.optJSONObject("last_message");
-                            if (lm != null) {
-                                String lmText = lm.optString("text", "").trim();
-                                if (!lmText.isEmpty()) {
-                                    hint = lmText.substring(0, Math.min(30, lmText.length()));
-                                }
-                            }
-                            groups.add(new String[]{guid, hint});
+                            if (guid.isEmpty()) continue;
+                            // Use cached name if available
+                            String cachedName = getPrefs().getString("rubika_group_name_" + guid, "");
+                            String displayName = !cachedName.isEmpty() ? cachedName : guid;
+                            chats.add(new String[]{guid, displayName});
                         }
                     }
 
-                    String saved = getPrefs().getString("rubika_groups", "");
-                    if (!saved.isEmpty()) {
-                        for (String g : saved.split(",")) {
-                            if (!g.isEmpty()) selectedGuids.add(g);
+                    // Default: select all for monitoring
+                    String savedMonitor = getPrefs().getString("rubika_groups", "");
+                    if (savedMonitor.isEmpty()) {
+                        for (String[] c : chats) monitoredGuids.add(c[0]);
+                    } else {
+                        for (String g : savedMonitor.split(",")) {
+                            if (!g.isEmpty()) monitoredGuids.add(g);
                         }
                     }
+
+                    // Load saved forward destination
+                    forwardToGuid = getPrefs().getString("rubika_forward_to", "");
 
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            if (groups.isEmpty()) {
-                                statusTv.setText("هیچ گروهی پیدا نشد.");
-                            } else {
-                                statusTv.setText(groups.size() + " گروه پیدا شد");
-                            }
-                            setupGroupAdapter();
-                            groupLayout.setVisibility(View.VISIBLE);
+                            statusTv.setText(chats.size() + " چت پیدا شد");
+                            setupAdapters();
+                            chatLayout.setVisibility(View.VISIBLE);
                         }
                     });
+
+                    // Resolve names async for chats still showing GUIDs
+                    resolveNamesInBackground(auth, pk);
 
                 } catch (final Exception e) {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            statusTv.setText("خطا در بارگذاری گروه‌ها: " + e.getMessage());
+                            statusTv.setText("خطا در بارگذاری چت‌ها: " + e.getMessage());
                         }
                     });
                 }
@@ -428,52 +448,105 @@ public class RubikaLoginActivity extends Activity {
         }).start();
     }
 
-    private void setupGroupAdapter() {
-        groupList.setAdapter(new BaseAdapter() {
-            @Override public int getCount() { return groups.size(); }
-            @Override public Object getItem(int i) { return groups.get(i); }
+    private void resolveNamesInBackground(final String auth, final PrivateKey pk) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                for (int i = 0; i < chats.size(); i++) {
+                    if (!chats.get(i)[1].equals(chats.get(i)[0])) continue; // already has name
+                    String guid = chats.get(i)[0];
+                    String name = RubikaClient.getObjectTitle(RubikaLoginActivity.this, auth, pk, guid);
+                    if (name != null && !name.isEmpty()) {
+                        chats.get(i)[1] = name;
+                        getPrefs().edit().putString("rubika_group_name_" + guid, name).apply();
+                        runOnUiThread(new Runnable() {
+                            @Override public void run() {
+                                if (monitorList.getAdapter() != null)
+                                    ((BaseAdapter) monitorList.getAdapter()).notifyDataSetChanged();
+                                if (forwardList.getAdapter() != null)
+                                    ((BaseAdapter) forwardList.getAdapter()).notifyDataSetChanged();
+                            }
+                        });
+                    }
+                    try { Thread.sleep(200); } catch (InterruptedException e) { break; }
+                }
+            }
+        }).start();
+    }
+
+    private void setupAdapters() {
+        // Monitor list — checkboxes, default all checked
+        monitorList.setAdapter(new BaseAdapter() {
+            @Override public int getCount() { return chats.size(); }
+            @Override public Object getItem(int i) { return chats.get(i); }
             @Override public long getItemId(int i) { return i; }
             @Override public View getView(int pos, View v, ViewGroup parent) {
-                CheckBox cb;
-                if (v instanceof CheckBox) {
-                    cb = (CheckBox) v;
-                } else {
-                    cb = new CheckBox(RubikaLoginActivity.this);
-                    cb.setTextColor(Color.WHITE);
-                    cb.setTextSize(14);
-                    cb.setPadding(16, 12, 16, 12);
-                }
-                String[] g = groups.get(pos);
-                cb.setTag(g[0]);
-                cb.setText(g[1] + "\n" + g[0]);
-                cb.setChecked(selectedGuids.contains(g[0]));
+                CheckBox cb = (v instanceof CheckBox) ? (CheckBox) v : new CheckBox(RubikaLoginActivity.this);
+                cb.setTextColor(Color.WHITE);
+                cb.setTextSize(12);
+                cb.setPadding(16, 10, 16, 10);
+                String[] c = chats.get(pos);
+                cb.setTag(c[0]);
+                cb.setText(c[1].equals(c[0]) ? c[0] : c[1] + "\n" + c[0]);
+                cb.setChecked(monitoredGuids.contains(c[0]));
                 cb.setOnClickListener(new View.OnClickListener() {
                     @Override public void onClick(View view) {
                         String guid = (String) view.getTag();
-                        if (((CheckBox) view).isChecked()) selectedGuids.add(guid);
-                        else selectedGuids.remove(guid);
+                        if (((CheckBox) view).isChecked()) monitoredGuids.add(guid);
+                        else monitoredGuids.remove(guid);
                     }
                 });
                 return cb;
             }
         });
+
+        // Forward list — radio buttons, single selection
+        forwardList.setAdapter(new BaseAdapter() {
+            @Override public int getCount() { return chats.size() + 1; } // +1 for "none"
+            @Override public Object getItem(int i) { return i == 0 ? null : chats.get(i - 1); }
+            @Override public long getItemId(int i) { return i; }
+            @Override public View getView(int pos, View v, ViewGroup parent) {
+                RadioButton rb = (v instanceof RadioButton) ? (RadioButton) v : new RadioButton(RubikaLoginActivity.this);
+                rb.setTextColor(Color.WHITE);
+                rb.setTextSize(12);
+                rb.setPadding(16, 10, 16, 10);
+                if (pos == 0) {
+                    rb.setTag("");
+                    rb.setText("— غیرفعال (فوروارد نکن)");
+                    rb.setChecked(forwardToGuid.isEmpty());
+                } else {
+                    String[] c = chats.get(pos - 1);
+                    rb.setTag(c[0]);
+                    rb.setText(c[1].equals(c[0]) ? c[0] : c[1] + "\n" + c[0]);
+                    rb.setChecked(c[0].equals(forwardToGuid));
+                }
+                rb.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View view) {
+                        forwardToGuid = (String) view.getTag();
+                        ((BaseAdapter) forwardList.getAdapter()).notifyDataSetChanged();
+                    }
+                });
+                return rb;
+            }
+        });
     }
 
-    private void saveSelectedGroups() {
+    private void saveSelections() {
         StringBuilder sb = new StringBuilder();
         SharedPreferences.Editor ed = getPrefs().edit();
-        for (String g : selectedGuids) {
+        for (String g : monitoredGuids) {
             if (sb.length() > 0) sb.append(",");
             sb.append(g);
-            // Save name for each selected group
-            for (String[] pair : groups) {
-                if (pair[0].equals(g)) {
-                    ed.putString("rubika_group_name_" + g, pair[1]);
+            // Update name cache from resolved list
+            for (String[] c : chats) {
+                if (c[0].equals(g) && !c[1].equals(c[0])) {
+                    ed.putString("rubika_group_name_" + g, c[1]);
                     break;
                 }
             }
         }
-        ed.putString("rubika_groups", sb.toString()).apply();
+        ed.putString("rubika_groups", sb.toString());
+        ed.putString("rubika_forward_to", forwardToGuid);
+        ed.apply();
     }
 
     private void startRubikaService() {
@@ -507,15 +580,15 @@ public class RubikaLoginActivity extends Activity {
 
         android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(this);
         b.setTitle("لاگ روبیکا");
-        android.widget.ScrollView sv = new android.widget.ScrollView(this);
-        sv.setPadding(16, 8, 16, 8);
+        android.widget.ScrollView scrollV = new android.widget.ScrollView(this);
+        scrollV.setPadding(16, 8, 16, 8);
         final TextView tv = new TextView(this);
         tv.setTextColor(Color.parseColor("#80CBC4"));
         tv.setTextSize(8);
         tv.setTypeface(android.graphics.Typeface.MONOSPACE);
         tv.setText(filtered.isEmpty() ? "لاگی موجود نیست." : filtered);
-        sv.addView(tv);
-        b.setView(sv);
+        scrollV.addView(tv);
+        b.setView(scrollV);
         b.setPositiveButton("کپی", new android.content.DialogInterface.OnClickListener() {
             @Override public void onClick(android.content.DialogInterface d, int w) {
                 android.content.ClipboardManager cm =

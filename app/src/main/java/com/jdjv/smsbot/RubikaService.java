@@ -59,31 +59,30 @@ public class RubikaService extends Service {
     private void poll() {
         SharedPreferences prefs = getSharedPreferences("smsbot", Context.MODE_PRIVATE);
         String auth = prefs.getString("rubika_auth", "");
-        String groupsCsv = prefs.getString("rubika_groups", "");
+        String chatsCsv = prefs.getString("rubika_groups", "");
 
-        if (auth.isEmpty() || groupsCsv.isEmpty()) return;
+        if (auth.isEmpty() || chatsCsv.isEmpty()) return;
         if (!prefs.getBoolean("enabled", true)) return;
 
         PrivateKey pk = loadPrivateKey(prefs);
 
-        String[] guids = groupsCsv.split(",");
-        for (String guid : guids) {
+        for (String guid : chatsCsv.split(",")) {
             if (guid.trim().isEmpty()) continue;
-            pollGroup(auth, pk, guid.trim());
+            pollChat(auth, pk, guid.trim(), prefs);
         }
     }
 
-    private void pollGroup(String auth, PrivateKey pk, String guid) {
-        SharedPreferences prefs = getSharedPreferences("smsbot", Context.MODE_PRIVATE);
+    private void pollChat(String auth, PrivateKey pk, String guid, SharedPreferences prefs) {
         String lastKey = "rubika_last_" + guid;
         long lastMsgId = prefs.getLong(lastKey, 0);
         boolean firstPoll = (lastMsgId == 0);
-        String groupName = prefs.getString("rubika_group_name_" + guid, "");
-        if (groupName.isEmpty()) {
-            // Fetch and cache group title once
-            String fetched = RubikaClient.getGroupTitle(this, auth, pk, guid);
-            groupName = (fetched != null && !fetched.isEmpty()) ? fetched : guid;
-            prefs.edit().putString("rubika_group_name_" + guid, groupName).apply();
+
+        // Resolve and cache chat name
+        String chatName = prefs.getString("rubika_group_name_" + guid, "");
+        if (chatName.isEmpty()) {
+            String fetched = RubikaClient.getObjectTitle(this, auth, pk, guid);
+            chatName = (fetched != null && !fetched.isEmpty()) ? fetched : guid;
+            prefs.edit().putString("rubika_group_name_" + guid, chatName).apply();
         }
 
         try {
@@ -98,7 +97,9 @@ public class RubikaService extends Service {
             if (messages == null || messages.length() == 0) return;
 
             String myGuid = prefs.getString("rubika_my_guid", "");
+            String forwardTo = prefs.getString("rubika_forward_to", "");
             long newLastId = lastMsgId;
+            final String fChatName = chatName;
 
             for (int i = 0; i < messages.length(); i++) {
                 JSONObject msg = messages.getJSONObject(i);
@@ -106,25 +107,48 @@ public class RubikaService extends Service {
                 if (msgId <= lastMsgId) continue;
                 if (msgId > newLastId) newLastId = msgId;
 
-                // On first poll just advance the cursor — don't reply to history
+                // On first poll: just advance cursor, don't process old history
                 if (firstPoll) continue;
-
-                String text = msg.optString("text", "").trim();
-                if (text.isEmpty()) continue;
 
                 String senderGuid = msg.optString("author_object_guid",
                     msg.optString("from_object_guid", ""));
                 if (!myGuid.isEmpty() && myGuid.equals(senderGuid)) continue;
 
                 String senderName = msg.optString("author_title", senderGuid);
+                String msgType = msg.optString("type", "Text");
+                String text = msg.optString("text", "").trim();
+                final String fMsgIdStr = String.valueOf(msgId);
+                final long fMsgId = msgId;
 
-                ApiLogger.log(this, "RUBIKA_MSG", groupName + " | " + senderName + ": " + text);
+                ApiLogger.log(this, "RUBIKA_MSG", fChatName + " | " + senderName
+                    + " [" + msgType + "]: " + (text.isEmpty() ? "(media)" : text));
+
+                // ── Forward ALL messages (text, image, video, voice, file) ──
+                if (!forwardTo.isEmpty() && !forwardTo.equals(guid)) {
+                    final String fAuth = auth;
+                    final PrivateKey fPk = pk;
+                    final String fFromGuid = guid;
+                    final String fToGuid = forwardTo;
+                    new Thread(new Runnable() {
+                        @Override public void run() {
+                            try {
+                                RubikaClient.forwardMessages(RubikaService.this, fAuth, fPk,
+                                    fFromGuid, fMsgIdStr, fToGuid);
+                                ApiLogger.log(RubikaService.this, "RUBIKA_FWD",
+                                    fChatName + " → " + fToGuid);
+                            } catch (Exception e) {
+                                ApiLogger.log(RubikaService.this, "RUBIKA_FWD_ERR", e.getMessage());
+                            }
+                        }
+                    }).start();
+                }
+
+                // ── Claude reply for text messages only ──
+                if (text.isEmpty()) continue;
 
                 final String fAuth = auth;
                 final PrivateKey fPk = pk;
                 final String fGuid = guid;
-                final String fGroupName = groupName;
-                final long fMsgId = msgId;
                 final String fText = text;
                 final String fSender = senderName;
 
@@ -135,7 +159,7 @@ public class RubikaService extends Service {
                                 RubikaClient.sendMessage(RubikaService.this, fAuth, fPk,
                                     fGuid, reply, fMsgId);
                                 ApiLogger.log(RubikaService.this, "RUBIKA_SENT",
-                                    fGroupName + " -> " + reply);
+                                    fChatName + " -> " + reply);
                             } catch (Exception e) {
                                 ApiLogger.log(RubikaService.this, "RUBIKA_SEND_ERR", e.getMessage());
                             }
