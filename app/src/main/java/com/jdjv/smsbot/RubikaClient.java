@@ -30,6 +30,7 @@ public class RubikaClient {
             c.put("app_version", "3.8.2");
             c.put("platform", "Android");
             c.put("package", "app.rbmain.a");
+            c.put("lang_code", "fa");
         } catch (Exception ignored) {}
         CLIENT_INFO = c;
     }
