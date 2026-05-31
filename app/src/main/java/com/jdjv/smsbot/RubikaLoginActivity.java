@@ -257,6 +257,22 @@ public class RubikaLoginActivity extends Activity {
 
                     JSONObject resp = RubikaClient.signIn(RubikaLoginActivity.this, tmpAuth, phone, phoneHash, otp, pem);
 
+                    // Check for error before proceeding
+                    String signInStatus = resp.optString("status", "");
+                    if ("ERROR_ACTION".equals(signInStatus) || "ERROR".equals(signInStatus)) {
+                        final String det = resp.optString("status_det", signInStatus);
+                        throw new Exception("خطای ورود: " + det);
+                    }
+                    if (resp.has("data")) {
+                        JSONObject d = resp.optJSONObject("data");
+                        if (d != null) {
+                            String st = d.optString("status", "");
+                            if ("CodeIsInvalid".equals(st) || "InvalidCode".equals(st)) {
+                                throw new Exception("کد وارد شده اشتباه است");
+                            }
+                        }
+                    }
+
                     String auth = null;
                     String myGuid = null;
                     if (resp.has("data")) {
@@ -275,7 +291,7 @@ public class RubikaLoginActivity extends Activity {
                         }
                     }
                     if (auth == null && resp.has("auth")) auth = resp.getString("auth");
-                    if (auth == null) auth = tmpAuth;
+                    if (auth == null) throw new Exception("auth دریافت نشد — لطفاً دوباره امتحان کنید");
 
                     final String finalAuth = auth;
                     final PrivateKey finalPk = kp.getPrivate();
