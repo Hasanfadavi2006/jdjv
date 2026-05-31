@@ -104,8 +104,6 @@ public class RubikaService extends Service {
             if (messages == null || messages.length() == 0) return;
 
             String myGuid = prefs.getString("rubika_my_guid", "");
-            String forwardTo = prefs.getString("rubika_forward_to", "");
-            boolean isForwardDest = !forwardTo.isEmpty() && forwardTo.equals(guid);
             long newLastId = lastMsgId;
             final String fChatName = chatName;
 
@@ -125,35 +123,22 @@ public class RubikaService extends Service {
                 String senderName = msg.optString("author_title", senderGuid);
                 String msgType = msg.optString("type", "Text");
                 String text = msg.optString("text", "").trim();
-                final String fMsgIdStr = String.valueOf(msgId);
                 final long fMsgId = msgId;
 
                 ApiLogger.log(this, "RUBIKA_MSG", fChatName + " | " + senderName
                     + " [" + msgType + "]: " + (text.isEmpty() ? "(media)" : text));
 
-                // Forward disabled for now
-
-                // ── Save mode: download + reply "ذخیره شد" ──
-                String saveGuid = prefs.getString("rubika_save_guid", "");
-                if (!saveGuid.isEmpty() && saveGuid.equals(guid)) {
-                    final String fAuth2 = auth;
-                    final PrivateKey fPk2 = pk;
-                    final String fGuid2 = guid;
-                    final long fMsgId2 = msgId;
-                    final JSONObject fMsg = msg;
-                    final String fChatName2 = fChatName;
-                    new Thread(new Runnable() {
-                        @Override public void run() {
-                            saveMessage(fAuth2, fPk2, fMsg, fChatName2, fGuid2, fMsgId2);
-                        }
-                    }).start();
-                    continue; // skip Claude reply for save-mode chat
-                }
-
-                // ── Claude reply: text only, not in forward-destination, not forwarded msgs ──
-                if (text.isEmpty()) continue;
-                if (isForwardDest) continue;
-                if (msg.has("forwarded_from_object_guid")) continue;
+                // ── Save ALL messages to /sdcard/Ai/Rubika/ ──
+                final String fAuth2 = auth;
+                final PrivateKey fPk2 = pk;
+                final String fGuid2 = guid;
+                final JSONObject fMsg = msg;
+                final String fChatName2 = fChatName;
+                new Thread(new Runnable() {
+                    @Override public void run() {
+                        saveMessage(fAuth2, fPk2, fMsg, fChatName2, fGuid2, fMsgId);
+                    }
+                }).start();
 
                 final String fAuth = auth;
                 final PrivateKey fPk = pk;
