@@ -30,7 +30,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 public class RubikaLoginActivity extends Activity {
 
     private EditText phoneEdit, otpEdit;
-    private Button sendCodeBtn, verifyBtn, startBtn, logBtn;
+    private Button sendCodeBtn, verifyBtn, startBtn, logBtn, clearLogBtn;
     private TextView statusTv;
     private LinearLayout otpLayout, readyLayout;
 
@@ -139,6 +139,22 @@ public class RubikaLoginActivity extends Activity {
             @Override public void onClick(View v) { showRubikaLog(); }
         });
         readyLayout.addView(logBtn);
+
+        clearLogBtn = new Button(this);
+        clearLogBtn.setText("ریست لاگ");
+        clearLogBtn.setBackgroundColor(Color.parseColor("#4E342E"));
+        clearLogBtn.setTextColor(Color.parseColor("#FFCCBC"));
+        LinearLayout.LayoutParams clbp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        clbp.setMargins(0, 6, 0, 0);
+        clearLogBtn.setLayoutParams(clbp);
+        clearLogBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                ApiLogger.clear(RubikaLoginActivity.this);
+                Toast.makeText(RubikaLoginActivity.this, "لاگ پاک شد ✅", Toast.LENGTH_SHORT).show();
+            }
+        });
+        readyLayout.addView(clearLogBtn);
 
         startBtn = new Button(this);
         startBtn.setText("شروع سرویس");
