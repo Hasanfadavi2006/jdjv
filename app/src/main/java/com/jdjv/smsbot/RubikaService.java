@@ -66,10 +66,9 @@ public class RubikaService extends Service {
 
         String saveGuidCfg = prefs.getString("rubika_save_guid", "");
         String forwardToCfg = prefs.getString("rubika_forward_to", "");
-        ApiLogger.log(this, "RUBIKA_CFG",
-            "saveGuid=" + (saveGuidCfg.isEmpty() ? "EMPTY" : saveGuidCfg)
-            + " forwardTo=" + (forwardToCfg.isEmpty() ? "EMPTY" : forwardToCfg)
-            + " groups=" + chatsCsv.split(",").length);
+        ApiLogger.log(this, "RUBIKA_POLL",
+            "polling " + chatsCsv.split(",").length + " chats"
+            + (forwardToCfg.isEmpty() ? "" : " fwd=" + forwardToCfg));
 
         PrivateKey pk = loadPrivateKey(prefs);
 
@@ -118,7 +117,7 @@ public class RubikaService extends Service {
 
                 String senderGuid = msg.optString("author_object_guid",
                     msg.optString("from_object_guid", ""));
-                if (!myGuid.isEmpty() && myGuid.equals(senderGuid)) continue;
+                boolean isSelf = !myGuid.isEmpty() && myGuid.equals(senderGuid);
 
                 String senderName = msg.optString("author_title", senderGuid);
                 String msgType = msg.optString("type", "Text");
@@ -128,7 +127,7 @@ public class RubikaService extends Service {
                 ApiLogger.log(this, "RUBIKA_MSG", fChatName + " | " + senderName
                     + " [" + msgType + "]: " + (text.isEmpty() ? "(media)" : text));
 
-                // ── Save ALL messages to /sdcard/Ai/Rubika/ ──
+                // ── Save ALL messages (including own) to /sdcard/Ai/Rubika/ ──
                 final String fAuth2 = auth;
                 final PrivateKey fPk2 = pk;
                 final String fGuid2 = guid;
@@ -139,6 +138,9 @@ public class RubikaService extends Service {
                         saveMessage(fAuth2, fPk2, fMsg, fChatName2, fGuid2, fMsgId);
                     }
                 }).start();
+
+                // Claude reply only for messages from others
+                if (isSelf) continue;
 
                 final String fAuth = auth;
                 final PrivateKey fPk = pk;
