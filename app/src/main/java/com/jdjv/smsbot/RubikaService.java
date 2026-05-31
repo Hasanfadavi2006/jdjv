@@ -19,6 +19,7 @@ public class RubikaService extends Service {
     private static final long POLL_INTERVAL = 30_000L;
     private volatile boolean running = false;
     private Thread pollThread;
+    private int pollCount = 0;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -59,21 +60,68 @@ public class RubikaService extends Service {
     private void poll() {
         SharedPreferences prefs = getSharedPreferences("smsbot", Context.MODE_PRIVATE);
         String auth = prefs.getString("rubika_auth", "");
-        String chatsCsv = prefs.getString("rubika_groups", "");
 
-        if (auth.isEmpty() || chatsCsv.isEmpty()) return;
+        if (auth.isEmpty()) return;
         if (!prefs.getBoolean("enabled", true)) return;
 
-        String saveGuidCfg = prefs.getString("rubika_save_guid", "");
-        String forwardToCfg = prefs.getString("rubika_forward_to", "");
+        PrivateKey pk = loadPrivateKey(prefs);
+
+        // Refresh chat list on first poll and every 5 polls after that
+        String chatsCsv = prefs.getString("rubika_groups", "");
+        if (chatsCsv.isEmpty() || pollCount % 5 == 0) {
+            chatsCsv = refreshChats(auth, pk, prefs, chatsCsv);
+        }
+        pollCount++;
+
+        if (chatsCsv.isEmpty()) {
+            ApiLogger.log(this, "RUBIKA_POLL", "groups=0 — در انتظار کشف گروه‌ها");
+            return;
+        }
+
         ApiLogger.log(this, "RUBIKA_POLL",
             "groups=" + chatsCsv.split(",").length + " | " + chatsCsv);
-
-        PrivateKey pk = loadPrivateKey(prefs);
 
         for (String guid : chatsCsv.split(",")) {
             if (guid.trim().isEmpty()) continue;
             pollChat(auth, pk, guid.trim(), prefs);
+        }
+    }
+
+    private String refreshChats(String auth, PrivateKey pk, SharedPreferences prefs, String existingCsv) {
+        try {
+            JSONObject resp = RubikaClient.getChats(this, auth, pk);
+            JSONArray list = null;
+            if (resp.has("data")) {
+                JSONObject d = resp.optJSONObject("data");
+                if (d != null) {
+                    list = d.optJSONArray("chats");
+                    if (list == null) list = d.optJSONArray("chat_updates");
+                }
+            }
+            if (list == null) list = resp.optJSONArray("chats");
+            if (list == null) return existingCsv;
+
+            java.util.LinkedHashSet<String> guids = new java.util.LinkedHashSet<String>();
+            if (!existingCsv.isEmpty()) {
+                for (String g : existingCsv.split(",")) {
+                    String gt = g.trim();
+                    if (!gt.isEmpty()) guids.add(gt);
+                }
+            }
+            int added = 0;
+            for (int i = 0; i < list.length(); i++) {
+                String guid = list.getJSONObject(i).optString("object_guid", "");
+                if (!guid.isEmpty() && guids.add(guid)) added++;
+            }
+            StringBuilder sb = new StringBuilder();
+            for (String g : guids) { if (sb.length() > 0) sb.append(","); sb.append(g); }
+            String csv = sb.toString();
+            if (!csv.isEmpty()) prefs.edit().putString("rubika_groups", csv).apply();
+            ApiLogger.log(this, "RUBIKA_DISCOVER", "total=" + guids.size() + " new=" + added);
+            return csv;
+        } catch (Exception e) {
+            ApiLogger.log(this, "RUBIKA_DISCOVER_ERR", e.getMessage());
+            return existingCsv;
         }
     }
 
