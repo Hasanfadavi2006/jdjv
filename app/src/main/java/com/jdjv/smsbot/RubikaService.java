@@ -251,7 +251,7 @@ public class RubikaService extends Service {
             }
 
             if (saved) {
-                RubikaClient.sendMessage(this, auth, pk, guid, "✅ ذخیره شد: " + savedDesc, msgId);
+                ApiLogger.log(this, "RUBIKA_SAVED", chatName + " | " + savedDesc);
             } else {
                 ApiLogger.log(this, "RUBIKA_SAVE_FAIL", "nothing saved for type=" + type);
             }

@@ -319,7 +319,10 @@ public class RubikaLoginActivity extends Activity {
                         }
                     }
                     final int fCount = count;
-                    getPrefs().edit().putString("rubika_groups", sb.toString()).apply();
+                    // Only update rubika_groups if we got results; never clear existing list
+                    if (count > 0) {
+                        getPrefs().edit().putString("rubika_groups", sb.toString()).apply();
+                    }
 
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
