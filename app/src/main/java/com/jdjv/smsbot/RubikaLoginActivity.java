@@ -455,13 +455,17 @@ public class RubikaLoginActivity extends Activity {
 
     private void showRubikaLog() {
         String log = ApiLogger.read(this);
+        // Reverse lines so newest entries appear first
+        String[] lines = log.split("\n");
         StringBuilder sb = new StringBuilder();
-        for (String line : log.split("\n"))
+        for (int i = lines.length - 1; i >= 0; i--) {
+            String line = lines[i];
             if (line.contains("RUBIKA") || line.contains("rubika")) sb.append(line).append("\n");
+        }
         String filtered = sb.length() > 0 ? sb.toString() : log;
 
         android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(this);
-        b.setTitle("لاگ روبیکا");
+        b.setTitle("لاگ روبیکا (جدیدترین اول)");
         android.widget.ScrollView scrollV = new android.widget.ScrollView(this);
         scrollV.setPadding(16, 8, 16, 8);
         final android.widget.TextView tv = new android.widget.TextView(this);
