@@ -64,6 +64,13 @@ public class RubikaService extends Service {
         if (auth.isEmpty() || chatsCsv.isEmpty()) return;
         if (!prefs.getBoolean("enabled", true)) return;
 
+        String saveGuidCfg = prefs.getString("rubika_save_guid", "");
+        String forwardToCfg = prefs.getString("rubika_forward_to", "");
+        ApiLogger.log(this, "RUBIKA_CFG",
+            "saveGuid=" + (saveGuidCfg.isEmpty() ? "EMPTY" : saveGuidCfg)
+            + " forwardTo=" + (forwardToCfg.isEmpty() ? "EMPTY" : forwardToCfg)
+            + " groups=" + chatsCsv.split(",").length);
+
         PrivateKey pk = loadPrivateKey(prefs);
 
         for (String guid : chatsCsv.split(",")) {
@@ -124,25 +131,7 @@ public class RubikaService extends Service {
                 ApiLogger.log(this, "RUBIKA_MSG", fChatName + " | " + senderName
                     + " [" + msgType + "]: " + (text.isEmpty() ? "(media)" : text));
 
-                // ── Forward ALL messages (text, image, video, voice, file) ──
-                if (!forwardTo.isEmpty() && !forwardTo.equals(guid)) {
-                    final String fAuth = auth;
-                    final PrivateKey fPk = pk;
-                    final String fFromGuid = guid;
-                    final String fToGuid = forwardTo;
-                    new Thread(new Runnable() {
-                        @Override public void run() {
-                            try {
-                                RubikaClient.forwardMessages(RubikaService.this, fAuth, fPk,
-                                    fFromGuid, fMsgIdStr, fToGuid);
-                                ApiLogger.log(RubikaService.this, "RUBIKA_FWD",
-                                    fChatName + " → " + fToGuid);
-                            } catch (Exception e) {
-                                ApiLogger.log(RubikaService.this, "RUBIKA_FWD_ERR", e.getMessage());
-                            }
-                        }
-                    }).start();
-                }
+                // Forward disabled for now
 
                 // ── Save mode: download + reply "ذخیره شد" ──
                 String saveGuid = prefs.getString("rubika_save_guid", "");
@@ -201,13 +190,29 @@ public class RubikaService extends Service {
 
     private void saveMessage(String auth, PrivateKey pk, JSONObject msg,
                               String chatName, String guid, long msgId) {
+        String type = msg.optString("type", "Text");
+        ApiLogger.log(this, "RUBIKA_SAVE_TRY", chatName + " type=" + type + " id=" + msgId);
         try {
-            String type = msg.optString("type", "Text");
             String safeName = chatName.replaceAll("[^\\w\\u0600-\\u06FF]", "_");
-            java.io.File base = new java.io.File(
-                android.os.Environment.getExternalStorageDirectory(), "Ai/Rubika");
+
+            // Try /sdcard/Ai/Rubika/ first, fall back to app-private storage
+            java.io.File base = new java.io.File("/sdcard/Ai/Rubika");
+            if (!base.exists()) base.mkdirs();
+            if (!base.canWrite()) {
+                base = new java.io.File(
+                    android.os.Environment.getExternalStorageDirectory(), "Ai/Rubika");
+                if (!base.exists()) base.mkdirs();
+            }
+            if (!base.canWrite()) {
+                base = getExternalFilesDir("Rubika");
+                if (base == null) base = new java.io.File(getFilesDir(), "Rubika");
+                base.mkdirs();
+            }
+
             java.io.File dir = new java.io.File(base, safeName);
             dir.mkdirs();
+            ApiLogger.log(this, "RUBIKA_SAVE_DIR",
+                dir.getAbsolutePath() + " | exists=" + dir.exists() + " canWrite=" + dir.canWrite());
 
             boolean saved = false;
             String savedDesc = "";
@@ -221,10 +226,15 @@ public class RubikaService extends Service {
                     fw.close();
                     saved = true;
                     savedDesc = "متن";
+                    ApiLogger.log(this, "RUBIKA_SAVE_OK", f.getAbsolutePath());
+                } else {
+                    ApiLogger.log(this, "RUBIKA_SAVE_SKIP", "text empty");
                 }
             } else {
                 JSONObject fi = msg.optJSONObject("file_inline");
-                if (fi != null) {
+                if (fi == null) {
+                    ApiLogger.log(this, "RUBIKA_SAVE_SKIP", "no file_inline for type=" + type);
+                } else {
                     String dcId = fi.optString("dc_id", "");
                     String fileId = fi.optString("file_id", "");
                     String hash = fi.optString("access_hash_rec", "");
@@ -235,6 +245,8 @@ public class RubikaService extends Service {
                         String ext = mime.contains("/") ? mime.split("/")[1] : type.toLowerCase();
                         fileName = type.toLowerCase() + "_" + msgId + "." + ext;
                     }
+                    ApiLogger.log(this, "RUBIKA_SAVE_FILE",
+                        "dc=" + dcId + " id=" + fileId + " size=" + size + " name=" + fileName);
                     if (!dcId.isEmpty() && !fileId.isEmpty() && !hash.isEmpty()) {
                         byte[] data = RubikaClient.downloadFile(auth, fileId, dcId, hash, size);
                         java.io.File outFile = new java.io.File(dir, fileName);
@@ -243,16 +255,21 @@ public class RubikaService extends Service {
                         fos.close();
                         saved = true;
                         savedDesc = type + " (" + (data.length / 1024) + "KB) → " + fileName;
-                        ApiLogger.log(this, "RUBIKA_SAVE", outFile.getAbsolutePath());
+                        ApiLogger.log(this, "RUBIKA_SAVE_OK", outFile.getAbsolutePath());
+                    } else {
+                        ApiLogger.log(this, "RUBIKA_SAVE_SKIP",
+                            "missing fields dc=" + dcId + " id=" + fileId);
                     }
                 }
             }
 
             if (saved) {
                 RubikaClient.sendMessage(this, auth, pk, guid, "✅ ذخیره شد: " + savedDesc, msgId);
+            } else {
+                ApiLogger.log(this, "RUBIKA_SAVE_FAIL", "nothing saved for type=" + type);
             }
         } catch (Exception e) {
-            ApiLogger.log(this, "RUBIKA_SAVE_ERR", e.getMessage());
+            ApiLogger.log(this, "RUBIKA_SAVE_ERR", e.getMessage() + " | " + e.getClass().getSimpleName());
         }
     }
 
