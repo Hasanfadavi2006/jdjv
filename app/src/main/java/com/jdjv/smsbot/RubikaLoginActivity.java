@@ -183,7 +183,10 @@ public class RubikaLoginActivity extends Activity {
 
         startBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                if (!hasStoragePermission()) { requestStoragePermission(); return; }
+                // Start service regardless of permission — saveMessage falls back to app dir if needed
+                if (Build.VERSION.SDK_INT >= 30 && !hasStoragePermission()) {
+                    requestStoragePermission(); // request in background, don't block start
+                }
                 startRubikaService();
                 Toast.makeText(RubikaLoginActivity.this, "سرویس روبیکا شروع شد ✅", Toast.LENGTH_SHORT).show();
                 finish();

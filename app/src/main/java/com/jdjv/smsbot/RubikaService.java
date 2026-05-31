@@ -180,17 +180,16 @@ public class RubikaService extends Service {
 
             // Try /sdcard/Ai/Rubika/ first, fall back to app-private storage
             java.io.File base = new java.io.File("/sdcard/Ai/Rubika");
-            if (!base.exists()) base.mkdirs();
-            if (!base.canWrite()) {
-                base = new java.io.File(
-                    android.os.Environment.getExternalStorageDirectory(), "Ai/Rubika");
-                if (!base.exists()) base.mkdirs();
-            }
-            if (!base.canWrite()) {
-                base = getExternalFilesDir("Rubika");
-                if (base == null) base = new java.io.File(getFilesDir(), "Rubika");
-                base.mkdirs();
-            }
+            // Primary: always-writable app-external dir (no permission needed)
+            java.io.File appExternal = getExternalFilesDir("Rubika");
+            if (appExternal == null) appExternal = new java.io.File(getFilesDir(), "Rubika");
+            appExternal.mkdirs();
+            base = appExternal;
+
+            // Bonus: also try /sdcard/Ai/Rubika/ if writable (needs MANAGE_EXTERNAL_STORAGE on API 30+)
+            java.io.File sdcard = new java.io.File("/sdcard/Ai/Rubika");
+            if (!sdcard.exists()) sdcard.mkdirs();
+            if (sdcard.canWrite()) base = sdcard;
 
             java.io.File dir = new java.io.File(base, safeName);
             dir.mkdirs();
