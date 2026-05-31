@@ -371,9 +371,39 @@ public class RubikaClient {
     }
 
     public static JSONObject getChats(Context ctx, String auth, PrivateKey pk) throws Exception {
-        JSONObject input = new JSONObject();
-        input.put("start_id", JSONObject.NULL);
-        return callApi(ctx, auth, false, "getChats", input, pk);
+        // Paginate through all pages and merge into a single response
+        JSONArray allChats = new JSONArray();
+        String startId = null;
+        int maxPages = 15;
+        while (maxPages-- > 0) {
+            JSONObject input = new JSONObject();
+            input.put("start_id", startId == null ? JSONObject.NULL : startId);
+            JSONObject resp = callApi(ctx, auth, false, "getChats", input, pk);
+            JSONArray page = null;
+            if (resp.has("data")) {
+                JSONObject d = resp.optJSONObject("data");
+                if (d != null) {
+                    page = d.optJSONArray("chats");
+                    if (page == null) page = d.optJSONArray("chat_updates");
+                }
+            }
+            if (page == null || page.length() == 0) break;
+            String lastSortId = null;
+            for (int i = 0; i < page.length(); i++) {
+                JSONObject chat = page.getJSONObject(i);
+                allChats.put(chat);
+                String s = chat.optString("sort_id", "");
+                if (!s.isEmpty()) lastSortId = s;
+            }
+            if (page.length() < 20 || lastSortId == null) break;
+            startId = lastSortId;
+        }
+        JSONObject data = new JSONObject();
+        data.put("chats", allChats);
+        JSONObject merged = new JSONObject();
+        merged.put("status", "OK");
+        merged.put("data", data);
+        return merged;
     }
 
     public static JSONObject getMessages(Context ctx, String auth, PrivateKey pk,
