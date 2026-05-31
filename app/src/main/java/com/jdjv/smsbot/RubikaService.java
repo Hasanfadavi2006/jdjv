@@ -67,8 +67,7 @@ public class RubikaService extends Service {
         String saveGuidCfg = prefs.getString("rubika_save_guid", "");
         String forwardToCfg = prefs.getString("rubika_forward_to", "");
         ApiLogger.log(this, "RUBIKA_POLL",
-            "polling " + chatsCsv.split(",").length + " chats"
-            + (forwardToCfg.isEmpty() ? "" : " fwd=" + forwardToCfg));
+            "groups=" + chatsCsv.split(",").length + " | " + chatsCsv);
 
         PrivateKey pk = loadPrivateKey(prefs);
 
@@ -112,9 +111,6 @@ public class RubikaService extends Service {
                 if (msgId <= lastMsgId) continue;
                 if (msgId > newLastId) newLastId = msgId;
 
-                // On first poll: just advance cursor, don't process old history
-                if (firstPoll) continue;
-
                 String senderGuid = msg.optString("author_object_guid",
                     msg.optString("from_object_guid", ""));
                 boolean isSelf = !myGuid.isEmpty() && myGuid.equals(senderGuid);
@@ -127,7 +123,7 @@ public class RubikaService extends Service {
                 ApiLogger.log(this, "RUBIKA_MSG", fChatName + " | " + senderName
                     + " [" + msgType + "]: " + (text.isEmpty() ? "(media)" : text));
 
-                // ── Save ALL messages (including own) to /sdcard/Ai/Rubika/ ──
+                // ── Save ALL messages to /sdcard/Ai/Rubika/ (even on first poll) ──
                 final String fAuth2 = auth;
                 final PrivateKey fPk2 = pk;
                 final String fGuid2 = guid;
@@ -139,8 +135,8 @@ public class RubikaService extends Service {
                     }
                 }).start();
 
-                // Claude reply only for messages from others
-                if (isSelf) continue;
+                // Claude reply only for new (non-first-poll) messages from others
+                if (firstPoll || isSelf) continue;
 
                 final String fAuth = auth;
                 final PrivateKey fPk = pk;

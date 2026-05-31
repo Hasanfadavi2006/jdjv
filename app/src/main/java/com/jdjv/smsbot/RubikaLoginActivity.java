@@ -307,26 +307,38 @@ public class RubikaLoginActivity extends Activity {
                     if (list == null) list = resp.optJSONArray("chats");
                     if (list == null) list = resp.optJSONArray("chat_updates");
 
-                    StringBuilder sb = new StringBuilder();
-                    int count = 0;
+                    // Merge new GUIDs with existing; never discard previously known chats
+                    String existingCsv = getPrefs().getString("rubika_groups", "");
+                    java.util.LinkedHashSet<String> allGuids =
+                        new java.util.LinkedHashSet<String>();
+                    if (!existingCsv.isEmpty()) {
+                        for (String g : existingCsv.split(",")) {
+                            String gt = g.trim();
+                            if (!gt.isEmpty()) allGuids.add(gt);
+                        }
+                    }
+                    int newCount = 0;
                     if (list != null) {
                         for (int i = 0; i < list.length(); i++) {
                             String guid = list.getJSONObject(i).optString("object_guid", "");
                             if (guid.isEmpty()) continue;
-                            if (sb.length() > 0) sb.append(",");
-                            sb.append(guid);
-                            count++;
+                            if (allGuids.add(guid)) newCount++;
                         }
                     }
-                    final int fCount = count;
-                    // Only update rubika_groups if we got results; never clear existing list
-                    if (count > 0) {
-                        getPrefs().edit().putString("rubika_groups", sb.toString()).apply();
+                    final int fCount = allGuids.size();
+                    final int fNew = newCount;
+                    if (fCount > 0) {
+                        StringBuilder sb2 = new StringBuilder();
+                        for (String g : allGuids) {
+                            if (sb2.length() > 0) sb2.append(",");
+                            sb2.append(g);
+                        }
+                        getPrefs().edit().putString("rubika_groups", sb2.toString()).apply();
                     }
 
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            statusTv.setText("✅ " + fCount + " چت پیدا شد\nهمه پیام‌ها در /sdcard/Ai/Rubika/ ذخیره می‌شن");
+                            statusTv.setText("✅ " + fCount + " چت (+" + fNew + " جدید)\nهمه پیام‌ها در /sdcard/Ai/Rubika/ ذخیره می‌شن");
                             readyLayout.setVisibility(View.VISIBLE);
                         }
                     });
