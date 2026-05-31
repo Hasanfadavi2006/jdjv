@@ -606,12 +606,14 @@ public class RubikaLoginActivity extends Activity {
     }
 
     private void saveSelections() {
+        // If a save group is chosen, make sure it's also monitored
+        if (!saveGuid.isEmpty()) monitoredGuids.add(saveGuid);
+
         StringBuilder sb = new StringBuilder();
         SharedPreferences.Editor ed = getPrefs().edit();
         for (String g : monitoredGuids) {
             if (sb.length() > 0) sb.append(",");
             sb.append(g);
-            // Update name cache from resolved list
             for (String[] c : chats) {
                 if (c[0].equals(g) && !c[1].equals(c[0])) {
                     ed.putString("rubika_group_name_" + g, c[1]);
