@@ -98,6 +98,7 @@ public class RubikaService extends Service {
 
             String myGuid = prefs.getString("rubika_my_guid", "");
             String forwardTo = prefs.getString("rubika_forward_to", "");
+            boolean isForwardDest = !forwardTo.isEmpty() && forwardTo.equals(guid);
             long newLastId = lastMsgId;
             final String fChatName = chatName;
 
@@ -160,8 +161,10 @@ public class RubikaService extends Service {
                     continue; // skip Claude reply for save-mode chat
                 }
 
-                // ── Claude reply for text messages only ──
+                // ── Claude reply: text only, not in forward-destination, not forwarded msgs ──
                 if (text.isEmpty()) continue;
+                if (isForwardDest) continue;
+                if (msg.has("forwarded_from_object_guid")) continue;
 
                 final String fAuth = auth;
                 final PrivateKey fPk = pk;

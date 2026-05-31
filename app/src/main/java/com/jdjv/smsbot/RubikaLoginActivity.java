@@ -372,8 +372,12 @@ public class RubikaLoginActivity extends Activity {
                                     auth = encAuth;
                                 }
                             }
-                            JSONObject account = d.optJSONObject("account");
-                            if (account != null) myGuid = account.optString("object_guid", null);
+                            JSONObject account = d.optJSONObject("user");
+                            if (account == null) account = d.optJSONObject("account");
+                            if (account != null) {
+                                myGuid = account.optString("user_guid",
+                                    account.optString("object_guid", null));
+                            }
                         }
                     }
                     if (auth == null && resp.has("auth")) auth = resp.getString("auth");

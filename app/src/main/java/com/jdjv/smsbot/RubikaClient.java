@@ -393,6 +393,26 @@ public class RubikaClient {
         input.put("text", text);
         input.put("rnd", (long)(Math.random() * 2_147_483_647L));
         if (replyToId > 0) input.put("reply_to_message_id", replyToId);
-        return callApi(ctx, auth, false, "sendMessage", input, pk);
+        JSONObject resp = callApi(ctx, auth, false, "sendMessage", input, pk);
+        // Auto-learn own GUID from first sent message if not yet stored
+        if (ctx != null) {
+            android.content.SharedPreferences prefs =
+                ctx.getSharedPreferences("smsbot", android.content.Context.MODE_PRIVATE);
+            if (prefs.getString("rubika_my_guid", "").isEmpty()) {
+                try {
+                    JSONObject upd = resp.optJSONObject("data");
+                    if (upd != null) upd = upd.optJSONObject("message_update");
+                    if (upd != null) upd = upd.optJSONObject("message");
+                    if (upd != null) {
+                        String self = upd.optString("author_object_guid", "");
+                        if (!self.isEmpty()) {
+                            prefs.edit().putString("rubika_my_guid", self).apply();
+                            ApiLogger.log(ctx, "RUBIKA_GUID", "auto myGuid=" + self);
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+        return resp;
     }
 }
