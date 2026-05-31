@@ -1,11 +1,17 @@
 package com.jdjv.smsbot;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.Settings;
 import android.util.Base64;
 import android.view.Gravity;
 import android.view.View;
@@ -30,6 +36,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class RubikaLoginActivity extends Activity {
 
@@ -191,7 +200,7 @@ public class RubikaLoginActivity extends Activity {
         chatLayout.addView(saveLabel);
 
         TextView saveHint = new TextView(this);
-        saveHint.setText("هر پیامی (متن، عکس، ویدیو، ویس، فایل) ذخیره می‌شه + ریپلای «✅ ذخیره شد»\nمسیر: Android/data/com.jdjv.smsbot/files/Rubika/");
+        saveHint.setText("هر پیامی (متن، عکس، ویدیو، ویس، فایل) ذخیره می‌شه + ریپلای «✅ ذخیره شد»\nمسیر: /sdcard/Ai/Rubika/");
         saveHint.setTextColor(Color.GRAY);
         saveHint.setTextSize(10);
         saveHint.setPadding(0, 0, 0, 6);
@@ -267,6 +276,10 @@ public class RubikaLoginActivity extends Activity {
             @Override public void onClick(View v) {
                 if (monitoredGuids.isEmpty()) {
                     Toast.makeText(RubikaLoginActivity.this, "حداقل یک چت انتخاب کنید", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!hasStoragePermission()) {
+                    requestStoragePermission();
                     return;
                 }
                 saveSelections();
@@ -475,28 +488,36 @@ public class RubikaLoginActivity extends Activity {
     }
 
     private void resolveNamesInBackground(final String auth, final PrivateKey pk) {
-        new Thread(new Runnable() {
-            @Override public void run() {
-                for (int i = 0; i < chats.size(); i++) {
-                    if (!chats.get(i)[1].equals(chats.get(i)[0])) continue; // already has name
-                    String guid = chats.get(i)[0];
-                    String name = RubikaClient.getObjectTitle(RubikaLoginActivity.this, auth, pk, guid);
-                    if (name != null && !name.isEmpty()) {
-                        chats.get(i)[1] = name;
-                        getPrefs().edit().putString("rubika_group_name_" + guid, name).apply();
-                        runOnUiThread(new Runnable() {
-                            @Override public void run() {
-                                if (monitorList.getAdapter() != null)
-                                    ((BaseAdapter) monitorList.getAdapter()).notifyDataSetChanged();
-                                if (forwardList.getAdapter() != null)
-                                    ((BaseAdapter) forwardList.getAdapter()).notifyDataSetChanged();
-                            }
-                        });
+        final AtomicInteger idx = new AtomicInteger(0);
+        final ExecutorService pool = Executors.newFixedThreadPool(4);
+        for (int t = 0; t < 4; t++) {
+            pool.execute(new Runnable() {
+                @Override public void run() {
+                    int i;
+                    while ((i = idx.getAndIncrement()) < chats.size()) {
+                        if (!chats.get(i)[1].equals(chats.get(i)[0])) continue;
+                        final String guid = chats.get(i)[0];
+                        String name = RubikaClient.getObjectTitle(
+                            RubikaLoginActivity.this, auth, pk, guid);
+                        if (name != null && !name.isEmpty()) {
+                            chats.get(i)[1] = name;
+                            getPrefs().edit().putString("rubika_group_name_" + guid, name).apply();
+                            runOnUiThread(new Runnable() {
+                                @Override public void run() {
+                                    if (monitorList.getAdapter() != null)
+                                        ((BaseAdapter) monitorList.getAdapter()).notifyDataSetChanged();
+                                    if (forwardList.getAdapter() != null)
+                                        ((BaseAdapter) forwardList.getAdapter()).notifyDataSetChanged();
+                                    if (saveList.getAdapter() != null)
+                                        ((BaseAdapter) saveList.getAdapter()).notifyDataSetChanged();
+                                }
+                            });
+                        }
                     }
-                    try { Thread.sleep(200); } catch (InterruptedException e) { break; }
                 }
-            }
-        }).start();
+            });
+        }
+        pool.shutdown();
     }
 
     private void setupAdapters() {
@@ -598,6 +619,66 @@ public class RubikaLoginActivity extends Activity {
         ed.putString("rubika_forward_to", forwardToGuid);
         ed.putString("rubika_save_guid", saveGuid);
         ed.apply();
+    }
+
+    private boolean hasStoragePermission() {
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                java.lang.reflect.Method m = Environment.class.getMethod("isExternalStorageManager");
+                return Boolean.TRUE.equals(m.invoke(null));
+            } catch (Exception e) { return true; }
+        }
+        return checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestStoragePermission() {
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                Intent i = new Intent("android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION",
+                    Uri.parse("package:" + getPackageName()));
+                startActivityForResult(i, 101);
+            } catch (Exception e) {
+                try {
+                    startActivityForResult(
+                        new Intent("android.settings.MANAGE_ALL_FILES_ACCESS_PERMISSION"), 101);
+                } catch (Exception e2) {
+                    Toast.makeText(this, "لطفاً دسترسی فایل را در تنظیمات فعال کنید", Toast.LENGTH_LONG).show();
+                }
+            }
+        } else {
+            requestPermissions(
+                new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                             Manifest.permission.READ_EXTERNAL_STORAGE}, 100);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] perms, int[] results) {
+        if (code == 100) {
+            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+                saveSelections();
+                startRubikaService();
+                Toast.makeText(this, "سرویس روبیکا شروع شد", Toast.LENGTH_SHORT).show();
+                finish();
+            } else {
+                Toast.makeText(this, "دسترسی به حافظه لازم است", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        if (req == 101) {
+            if (hasStoragePermission()) {
+                saveSelections();
+                startRubikaService();
+                Toast.makeText(this, "سرویس روبیکا شروع شد", Toast.LENGTH_SHORT).show();
+                finish();
+            } else {
+                Toast.makeText(this, "دسترسی به حافظه لازم است", Toast.LENGTH_LONG).show();
+            }
+        }
     }
 
     private void startRubikaService() {

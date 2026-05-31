@@ -201,7 +201,9 @@ public class RubikaService extends Service {
         try {
             String type = msg.optString("type", "Text");
             String safeName = chatName.replaceAll("[^\\w\\u0600-\\u06FF]", "_");
-            java.io.File dir = new java.io.File(getExternalFilesDir("Rubika"), safeName);
+            java.io.File base = new java.io.File(
+                android.os.Environment.getExternalStorageDirectory(), "Ai/Rubika");
+            java.io.File dir = new java.io.File(base, safeName);
             dir.mkdirs();
 
             boolean saved = false;
