@@ -343,6 +343,33 @@ public class RubikaClient {
         return getObjectTitle(ctx, auth, pk, guid);
     }
 
+    /**
+     * Download a file from Rubika CDN.
+     * Headers per rubpy network.py: auth, file-id, access-hash-rec, start-index, last-index.
+     */
+    public static byte[] downloadFile(String auth, String fileId, String dcId,
+                                       String accessHashRec, long fileSize) throws Exception {
+        URL url = new URL("https://messenger" + dcId + ".iranlms.ir/GetFile.ashx");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("auth", decodeAuth(auth));
+        conn.setRequestProperty("file-id", fileId);
+        conn.setRequestProperty("access-hash-rec", accessHashRec);
+        conn.setRequestProperty("user-agent", "okhttp/3.12.1");
+        conn.setRequestProperty("start-index", "0");
+        conn.setRequestProperty("last-index", String.valueOf(fileSize > 0 ? fileSize - 1 : 0));
+        conn.setConnectTimeout(30000);
+        conn.setReadTimeout(120000);
+        InputStream is = conn.getInputStream();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buf = new byte[65536];
+        int n;
+        while ((n = is.read(buf)) != -1) baos.write(buf, 0, n);
+        is.close();
+        conn.disconnect();
+        return baos.toByteArray();
+    }
+
     public static JSONObject getChats(Context ctx, String auth, PrivateKey pk) throws Exception {
         JSONObject input = new JSONObject();
         input.put("start_id", JSONObject.NULL);

@@ -143,6 +143,23 @@ public class RubikaService extends Service {
                     }).start();
                 }
 
+                // ── Save mode: download + reply "ذخیره شد" ──
+                String saveGuid = prefs.getString("rubika_save_guid", "");
+                if (!saveGuid.isEmpty() && saveGuid.equals(guid)) {
+                    final String fAuth2 = auth;
+                    final PrivateKey fPk2 = pk;
+                    final String fGuid2 = guid;
+                    final long fMsgId2 = msgId;
+                    final JSONObject fMsg = msg;
+                    final String fChatName2 = fChatName;
+                    new Thread(new Runnable() {
+                        @Override public void run() {
+                            saveMessage(fAuth2, fPk2, fMsg, fChatName2, fGuid2, fMsgId2);
+                        }
+                    }).start();
+                    continue; // skip Claude reply for save-mode chat
+                }
+
                 // ── Claude reply for text messages only ──
                 if (text.isEmpty()) continue;
 
@@ -176,6 +193,61 @@ public class RubikaService extends Service {
 
         } catch (Exception e) {
             ApiLogger.log(this, "RUBIKA_POLL_ERR", guid + ": " + e.getMessage());
+        }
+    }
+
+    private void saveMessage(String auth, PrivateKey pk, JSONObject msg,
+                              String chatName, String guid, long msgId) {
+        try {
+            String type = msg.optString("type", "Text");
+            String safeName = chatName.replaceAll("[^\\w\\u0600-\\u06FF]", "_");
+            java.io.File dir = new java.io.File(getExternalFilesDir("Rubika"), safeName);
+            dir.mkdirs();
+
+            boolean saved = false;
+            String savedDesc = "";
+
+            if ("Text".equals(type)) {
+                String text = msg.optString("text", "").trim();
+                if (!text.isEmpty()) {
+                    java.io.File f = new java.io.File(dir, "messages.txt");
+                    java.io.FileWriter fw = new java.io.FileWriter(f, true);
+                    fw.write("[" + new java.util.Date() + "] " + text + "\n");
+                    fw.close();
+                    saved = true;
+                    savedDesc = "متن";
+                }
+            } else {
+                JSONObject fi = msg.optJSONObject("file_inline");
+                if (fi != null) {
+                    String dcId = fi.optString("dc_id", "");
+                    String fileId = fi.optString("file_id", "");
+                    String hash = fi.optString("access_hash_rec", "");
+                    long size = fi.optLong("file_size", fi.optLong("size", 0));
+                    String fileName = fi.optString("file_name", "");
+                    if (fileName.isEmpty()) {
+                        String mime = fi.optString("mime", "");
+                        String ext = mime.contains("/") ? mime.split("/")[1] : type.toLowerCase();
+                        fileName = type.toLowerCase() + "_" + msgId + "." + ext;
+                    }
+                    if (!dcId.isEmpty() && !fileId.isEmpty() && !hash.isEmpty()) {
+                        byte[] data = RubikaClient.downloadFile(auth, fileId, dcId, hash, size);
+                        java.io.File outFile = new java.io.File(dir, fileName);
+                        java.io.FileOutputStream fos = new java.io.FileOutputStream(outFile);
+                        fos.write(data);
+                        fos.close();
+                        saved = true;
+                        savedDesc = type + " (" + (data.length / 1024) + "KB) → " + fileName;
+                        ApiLogger.log(this, "RUBIKA_SAVE", outFile.getAbsolutePath());
+                    }
+                }
+            }
+
+            if (saved) {
+                RubikaClient.sendMessage(this, auth, pk, guid, "✅ ذخیره شد: " + savedDesc, msgId);
+            }
+        } catch (Exception e) {
+            ApiLogger.log(this, "RUBIKA_SAVE_ERR", e.getMessage());
         }
     }
 

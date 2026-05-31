@@ -42,6 +42,7 @@ public class RubikaLoginActivity extends Activity {
     private LinearLayout chatLayout;
     private ListView monitorList;   // checkboxes — which chats to watch
     private ListView forwardList;   // radio — where to forward
+    private ListView saveList;      // radio — one chat to save everything from
 
     private String tmpAuth;
     private String phoneHash;
@@ -53,6 +54,8 @@ public class RubikaLoginActivity extends Activity {
     private final Set<String> monitoredGuids = new HashSet<>();
     // Single destination for forwarding; empty = disabled
     private String forwardToGuid = "";
+    // Single chat for save mode; empty = disabled
+    private String saveGuid = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -180,6 +183,27 @@ public class RubikaLoginActivity extends Activity {
         forwardList.setLayoutParams(flp);
         chatLayout.addView(forwardList);
 
+        // -- حالت ذخیره --
+        TextView saveLabel = new TextView(this);
+        saveLabel.setText("حالت ذخیره (تست) — یه چت انتخاب کن:");
+        saveLabel.setTextColor(Color.parseColor("#A5D6A7"));
+        saveLabel.setPadding(0, 20, 0, 4);
+        chatLayout.addView(saveLabel);
+
+        TextView saveHint = new TextView(this);
+        saveHint.setText("هر پیامی (متن، عکس، ویدیو، ویس، فایل) ذخیره می‌شه + ریپلای «✅ ذخیره شد»\nمسیر: Android/data/com.jdjv.smsbot/files/Rubika/");
+        saveHint.setTextColor(Color.GRAY);
+        saveHint.setTextSize(10);
+        saveHint.setPadding(0, 0, 0, 6);
+        chatLayout.addView(saveHint);
+
+        saveList = new ListView(this);
+        saveList.setBackgroundColor(Color.parseColor("#1A1A1A"));
+        LinearLayout.LayoutParams slp2 = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 400);
+        saveList.setLayoutParams(slp2);
+        chatLayout.addView(saveList);
+
         // -- لاگ --
         Button showLogBtn = new Button(this);
         showLogBtn.setText("نمایش لاگ روبیکا");
@@ -210,6 +234,7 @@ public class RubikaLoginActivity extends Activity {
         if (!existingAuth.isEmpty()) {
             authToken = existingAuth;
             forwardToGuid = getPrefs().getString("rubika_forward_to", "");
+            saveGuid = getPrefs().getString("rubika_save_guid", "");
             statusTv.setText("قبلاً وارد شدی. در حال بارگذاری چت‌ها...");
             loadChats(existingAuth, loadPrivateKey());
         }
@@ -423,8 +448,9 @@ public class RubikaLoginActivity extends Activity {
                         }
                     }
 
-                    // Load saved forward destination
+                    // Load saved selections
                     forwardToGuid = getPrefs().getString("rubika_forward_to", "");
+                    saveGuid = getPrefs().getString("rubika_save_guid", "");
 
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
@@ -499,35 +525,59 @@ public class RubikaLoginActivity extends Activity {
             }
         });
 
+        // Save list — radio buttons, single selection (same pattern as forward)
+        saveList.setAdapter(buildRadioAdapter(new RadioSelectCallback() {
+            @Override public String getSelected() { return saveGuid; }
+            @Override public void setSelected(String guid) {
+                saveGuid = guid;
+                ((BaseAdapter) saveList.getAdapter()).notifyDataSetChanged();
+            }
+        }));
+
         // Forward list — radio buttons, single selection
-        forwardList.setAdapter(new BaseAdapter() {
-            @Override public int getCount() { return chats.size() + 1; } // +1 for "none"
+        forwardList.setAdapter(buildRadioAdapter(new RadioSelectCallback() {
+            @Override public String getSelected() { return forwardToGuid; }
+            @Override public void setSelected(String guid) {
+                forwardToGuid = guid;
+                ((BaseAdapter) forwardList.getAdapter()).notifyDataSetChanged();
+            }
+        }));
+    }
+
+    interface RadioSelectCallback {
+        String getSelected();
+        void setSelected(String guid);
+    }
+
+    private BaseAdapter buildRadioAdapter(final RadioSelectCallback cb) {
+        return new BaseAdapter() {
+            @Override public int getCount() { return chats.size() + 1; }
             @Override public Object getItem(int i) { return i == 0 ? null : chats.get(i - 1); }
             @Override public long getItemId(int i) { return i; }
             @Override public View getView(int pos, View v, ViewGroup parent) {
-                RadioButton rb = (v instanceof RadioButton) ? (RadioButton) v : new RadioButton(RubikaLoginActivity.this);
+                RadioButton rb = (v instanceof RadioButton) ? (RadioButton) v
+                    : new RadioButton(RubikaLoginActivity.this);
                 rb.setTextColor(Color.WHITE);
                 rb.setTextSize(12);
                 rb.setPadding(16, 10, 16, 10);
                 if (pos == 0) {
                     rb.setTag("");
-                    rb.setText("— غیرفعال (فوروارد نکن)");
-                    rb.setChecked(forwardToGuid.isEmpty());
+                    rb.setText("— غیرفعال");
+                    rb.setChecked(cb.getSelected().isEmpty());
                 } else {
                     String[] c = chats.get(pos - 1);
                     rb.setTag(c[0]);
                     rb.setText(c[1].equals(c[0]) ? c[0] : c[1] + "\n" + c[0]);
-                    rb.setChecked(c[0].equals(forwardToGuid));
+                    rb.setChecked(c[0].equals(cb.getSelected()));
                 }
                 rb.setOnClickListener(new View.OnClickListener() {
                     @Override public void onClick(View view) {
-                        forwardToGuid = (String) view.getTag();
-                        ((BaseAdapter) forwardList.getAdapter()).notifyDataSetChanged();
+                        cb.setSelected((String) view.getTag());
                     }
                 });
                 return rb;
             }
-        });
+        };
     }
 
     private void saveSelections() {
@@ -546,6 +596,7 @@ public class RubikaLoginActivity extends Activity {
         }
         ed.putString("rubika_groups", sb.toString());
         ed.putString("rubika_forward_to", forwardToGuid);
+        ed.putString("rubika_save_guid", saveGuid);
         ed.apply();
     }
 
