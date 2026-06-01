@@ -62,6 +62,8 @@ public class RubikaService extends Service {
         SharedPreferences prefs = getSharedPreferences("smsbot", Context.MODE_PRIVATE);
         String auth = prefs.getString("rubika_auth", "");
 
+        ApiLogger.log(this, "RUBIKA_TICK", "poll#" + pollCount + " auth=" + (auth.isEmpty() ? "EMPTY" : "OK"));
+
         if (auth.isEmpty()) return;
         if (!prefs.getBoolean("enabled", true)) return;
 
