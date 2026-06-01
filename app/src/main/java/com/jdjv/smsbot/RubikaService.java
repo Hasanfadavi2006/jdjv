@@ -119,8 +119,8 @@ public class RubikaService extends Service {
                 return;
             }
 
-            String newState = data.optString("state", "");
-            // OldState responses use "timestamp" key instead of "state"
+            // new_state is the correct key (not "state")
+            String newState = data.optString("new_state", data.optString("state", ""));
             if (newState.isEmpty()) newState = data.optString("timestamp", "");
             String dataStatus = data.optString("status", "");
             ApiLogger.log(this, "RUBIKA_UPD", "dataStatus=" + dataStatus + " newState=" + newState.substring(0, Math.min(8, newState.length())));
@@ -129,17 +129,12 @@ public class RubikaService extends Service {
                 prefs.edit().putString("rubika_state", newState).apply();
             }
 
-            if ("OldState".equals(dataStatus) || "NoUpdates".equals(dataStatus)) return;
+            if ("OldState".equals(dataStatus)) return;
 
-            JSONArray chatUpdates = data.optJSONArray("chat_updates");
-            if (chatUpdates == null || chatUpdates.length() == 0) {
-                // Log all data keys so we can debug unexpected formats
-                StringBuilder keys = new StringBuilder();
-                java.util.Iterator<String> kit = data.keys();
-                while (kit.hasNext()) { if (keys.length() > 0) keys.append(","); keys.append(kit.next()); }
-                ApiLogger.log(this, "RUBIKA_UPD_KEYS", "data keys=" + keys);
-                return;
-            }
+            // Updates come in "chats" array (not "chat_updates" as initially assumed)
+            JSONArray chatUpdates = data.optJSONArray("chats");
+            if (chatUpdates == null) chatUpdates = data.optJSONArray("chat_updates");
+            if (chatUpdates == null || chatUpdates.length() == 0) return;
 
             ApiLogger.log(this, "RUBIKA_GOT", "chat_updates count=" + chatUpdates.length());
             String myGuid = prefs.getString("rubika_my_guid", "");
@@ -149,13 +144,23 @@ public class RubikaService extends Service {
                 String chatGuid = update.optString("object_guid", "");
                 if (chatGuid.isEmpty()) continue;
 
+                // Log update structure so we can see actual format
+                String updateType = update.optString("type", "");
+                StringBuilder updateKeys = new StringBuilder();
+                java.util.Iterator<String> ukit = update.keys();
+                while (ukit.hasNext()) { if (updateKeys.length() > 0) updateKeys.append(","); updateKeys.append(ukit.next()); }
+                ApiLogger.log(this, "RUBIKA_ITEM", "type=" + updateType + " keys=" + updateKeys);
+
+                // Try message_update.message wrapper first, then direct message field
+                JSONObject msg = null;
                 JSONObject msgUpdate = update.optJSONObject("message_update");
-                if (msgUpdate == null) continue;
-
-                String msgUpdateType = msgUpdate.optString("type", "");
-                if (!"NewMessage".equals(msgUpdateType)) continue;
-
-                JSONObject msg = msgUpdate.optJSONObject("message");
+                if (msgUpdate != null) {
+                    String msgUpdateType = msgUpdate.optString("type", "");
+                    if ("NewMessage".equals(msgUpdateType) || msgUpdateType.isEmpty()) {
+                        msg = msgUpdate.optJSONObject("message");
+                    }
+                }
+                if (msg == null) msg = update.optJSONObject("message");
                 if (msg == null) continue;
 
                 String chatName = prefs.getString("rubika_group_name_" + chatGuid, "");
