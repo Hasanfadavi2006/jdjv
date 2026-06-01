@@ -96,7 +96,6 @@ public class RubikaService extends Service {
             ApiLogger.log(this, "RUBIKA_TICK", "poll#" + pollCount + " auth=EMPTY");
             return;
         }
-        if (!prefs.getBoolean("enabled", true)) return;
 
         PrivateKey pk = loadPrivateKey(prefs);
         String state = prefs.getString("rubika_state", "0");
