@@ -26,12 +26,12 @@ public class RubikaService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        startRubikaForeground();
+        startFg();
         if (!running || pollThread == null || !pollThread.isAlive()) {
             running = true;
             pollCount = 0;
             pollThread = new Thread(new Runnable() {
-                @Override public void run() { pollLoop(); }
+                @Override public void run() { loop(); }
             });
             pollThread.setDaemon(true);
             pollThread.start();
@@ -40,226 +40,227 @@ public class RubikaService extends Service {
         return START_STICKY;
     }
 
-    private void startRubikaForeground() {
-        final String CHANNEL_ID = "rubika_svc";
-        if (Build.VERSION.SDK_INT >= 26) {
-            try {
-                Class<?> ncClass = Class.forName("android.app.NotificationChannel");
-                Object nc = ncClass
-                    .getConstructor(String.class, CharSequence.class, int.class)
-                    .newInstance(CHANNEL_ID, "Rubika Bot", 2);
-                NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-                nm.getClass().getMethod("createNotificationChannel", ncClass).invoke(nm, nc);
-                Notification.Builder b = (Notification.Builder) Notification.Builder.class
-                    .getConstructor(Context.class, String.class)
-                    .newInstance(this, CHANNEL_ID);
-                b.setContentTitle("SmsBat").setContentText("روبیکا فعال")
-                 .setSmallIcon(android.R.drawable.ic_menu_send);
+    @Override public void onDestroy() { running = false; if (pollThread != null) pollThread.interrupt(); super.onDestroy(); }
+    @Override public IBinder onBind(Intent i) { return null; }
+
+    private void startFg() {
+        try {
+            if (Build.VERSION.SDK_INT >= 26) {
+                Class<?> nc = Class.forName("android.app.NotificationChannel");
+                Object ch = nc.getConstructor(String.class, CharSequence.class, int.class)
+                    .newInstance("rub", "Rubika", 2);
+                ((NotificationManager) getSystemService(NOTIFICATION_SERVICE))
+                    .getClass().getMethod("createNotificationChannel", nc).invoke(getSystemService(NOTIFICATION_SERVICE), ch);
+                Notification.Builder b = (Notification.Builder)
+                    Notification.Builder.class.getConstructor(Context.class, String.class).newInstance(this, "rub");
+                b.setContentTitle("SmsBat").setContentText("روبیکا").setSmallIcon(android.R.drawable.ic_menu_send);
                 startForeground(7001, b.build());
-            } catch (Exception e) {
-                Log.e(TAG, "fg err: " + e);
+            } else {
+                startForeground(7001, new Notification.Builder(this)
+                    .setContentTitle("SmsBat").setContentText("روبیکا")
+                    .setSmallIcon(android.R.drawable.ic_menu_send).build());
             }
-        } else {
-            Notification n = new Notification.Builder(this)
-                .setContentTitle("SmsBat").setContentText("روبیکا فعال")
-                .setSmallIcon(android.R.drawable.ic_menu_send).build();
-            startForeground(7001, n);
-        }
+        } catch (Exception e) { Log.e(TAG, "fg:" + e); }
     }
 
-    @Override public void onDestroy() { running = false; if (pollThread != null) pollThread.interrupt(); super.onDestroy(); }
-    @Override public IBinder onBind(Intent intent) { return null; }
-
-    private void pollLoop() {
+    private void loop() {
         while (running) {
             try { poll(); } catch (Exception e) { ApiLogger.log(this, "RUBIKA_ERR", e.getMessage()); }
             try { Thread.sleep(POLL_INTERVAL); } catch (InterruptedException e) { break; }
         }
     }
 
-    private void poll() {
-        SharedPreferences prefs = getSharedPreferences("smsbot", Context.MODE_PRIVATE);
-        String auth = prefs.getString("rubika_auth", "");
+    private void poll() throws Exception {
+        SharedPreferences p = getSharedPreferences("smsbot", Context.MODE_PRIVATE);
+        String auth = p.getString("rubika_auth", "");
         if (auth.isEmpty()) { ApiLogger.log(this, "RUBIKA_TICK", "auth=EMPTY"); return; }
+        PrivateKey pk = loadPk(p);
 
-        PrivateKey pk = loadPrivateKey(prefs);
-        ApiLogger.log(this, "RUBIKA_TICK", "poll#" + pollCount);
-
-        // Refresh chat list on first poll and every 60 polls
-        if (pollCount % 60 == 0) {
-            refreshChats(auth, pk, prefs);
+        // Initialize state: look back 150 seconds so we catch recent messages
+        long state = p.getLong("rubika_state_ts", 0);
+        if (state == 0) {
+            state = System.currentTimeMillis() / 1000L - 150;
+            p.edit().putLong("rubika_state_ts", state).apply();
         }
+
+        ApiLogger.log(this, "RUBIKA_TICK", "poll#" + pollCount + " state=" + state);
         pollCount++;
 
-        String chatsCsv = prefs.getString("rubika_groups", "");
-        if (chatsCsv.isEmpty()) {
-            ApiLogger.log(this, "RUBIKA_WAIT", "no chats — refreshing");
-            refreshChats(auth, pk, prefs);
-            chatsCsv = prefs.getString("rubika_groups", "");
-            if (chatsCsv.isEmpty()) return;
+        JSONObject resp = RubikaClient.getChatsUpdates(this, auth, pk, String.valueOf(state));
+
+        if (!"OK".equals(resp.optString("status", ""))) {
+            ApiLogger.log(this, "RUBIKA_ERR", "status=" + resp.optString("status") + " " + resp.optString("status_det"));
+            return;
         }
 
-        for (String guid : chatsCsv.split(",")) {
-            guid = guid.trim();
-            if (!guid.isEmpty()) pollChat(auth, pk, guid, prefs);
+        JSONObject data = resp.optJSONObject("data");
+        if (data == null) { ApiLogger.log(this, "RUBIKA_ERR", "data=null"); return; }
+
+        // new_state is a Long in the response
+        long newState = data.optLong("new_state", 0);
+        String dataStatus = data.optString("status", "");
+        ApiLogger.log(this, "RUBIKA_UPD", "dataStatus=" + dataStatus + " newState=" + newState);
+
+        if (newState > 0 && newState != state) {
+            p.edit().putLong("rubika_state_ts", newState).apply();
+        }
+
+        if ("OldState".equals(dataStatus)) {
+            // OldState: server says our cursor is too old — advance to now
+            p.edit().putLong("rubika_state_ts", System.currentTimeMillis() / 1000L - 10).apply();
+            return;
+        }
+
+        JSONArray chats = data.optJSONArray("chats");
+        if (chats == null || chats.length() == 0) return;
+
+        ApiLogger.log(this, "RUBIKA_GOT", "updated chats=" + chats.length());
+        String myGuid = p.getString("rubika_my_guid", "");
+
+        for (int i = 0; i < chats.length(); i++) {
+            JSONObject chat = chats.getJSONObject(i);
+            String guid = chat.optString("object_guid", "");
+            if (guid.isEmpty()) continue;
+
+            int unseen = chat.optInt("count_unseen", 0);
+
+            // Chat display name from abs_object.title
+            String chatName = p.getString("rubika_group_name_" + guid, "");
+            if (chatName.isEmpty()) {
+                JSONObject abs = chat.optJSONObject("abs_object");
+                if (abs != null) chatName = abs.optString("title", "");
+                if (chatName.isEmpty()) chatName = guid.substring(0, Math.min(8, guid.length()));
+                p.edit().putString("rubika_group_name_" + guid, chatName).apply();
+            }
+
+            ApiLogger.log(this, "RUBIKA_CHAT", chatName + " unseen=" + unseen);
+            if (unseen <= 0) continue;
+
+            // last_message is the most recent message in this chat
+            JSONObject lastMsg = chat.optJSONObject("last_message");
+            if (lastMsg != null) {
+                handleMsg(auth, pk, guid, chatName, lastMsg, myGuid, p);
+            }
+
+            // If more than 1 unread, fetch the rest with getMessages
+            if (unseen > 1) {
+                long lastSeenId = 0;
+                try {
+                    String lsm = chat.optString("last_seen_my_mid", "0");
+                    if (!lsm.isEmpty() && !"null".equals(lsm)) lastSeenId = Long.parseLong(lsm);
+                } catch (Exception ignored) {}
+                fetchUnseen(auth, pk, guid, chatName, lastSeenId, myGuid, p);
+            }
         }
     }
 
-    private void refreshChats(String auth, PrivateKey pk, SharedPreferences prefs) {
+    private void handleMsg(String auth, PrivateKey pk, String guid, String chatName,
+                           JSONObject msg, String myGuid, SharedPreferences p) {
         try {
-            JSONObject resp = RubikaClient.getChats(this, auth, pk);
-            JSONArray list = null;
-            if (resp.has("data")) {
-                JSONObject d = resp.optJSONObject("data");
-                if (d != null) { list = d.optJSONArray("chats"); if (list == null) list = d.optJSONArray("chat_updates"); }
-            }
-            if (list == null) list = resp.optJSONArray("chats");
-            if (list == null) return;
+            // In getChatsUpdates, message_id is a String
+            String msgIdStr = msg.optString("message_id", "0");
+            long msgId = 0;
+            try { msgId = Long.parseLong(msgIdStr); } catch (Exception ignored) {}
 
-            java.util.LinkedHashSet<String> guids = new java.util.LinkedHashSet<String>();
-            String existing = prefs.getString("rubika_groups", "");
-            if (!existing.isEmpty()) for (String g : existing.split(",")) { String t = g.trim(); if (!t.isEmpty()) guids.add(t); }
-            int added = 0;
-            for (int i = 0; i < list.length(); i++) {
-                String g = list.getJSONObject(i).optString("object_guid", "");
-                if (!g.isEmpty() && guids.add(g)) added++;
+            // Skip already-processed messages
+            String seenKey = "rubika_last_" + guid;
+            long lastSeen = p.getLong(seenKey, 0);
+            if (msgId > 0 && msgId <= lastSeen) return;
+            if (msgId > lastSeen) p.edit().putLong(seenKey, msgId).apply();
+
+            String senderGuid = msg.optString("author_object_guid", "");
+            boolean isSelf = !myGuid.isEmpty() && myGuid.equals(senderGuid);
+            String senderName = msg.optString("author_title", senderGuid);
+            String type = msg.optString("type", "Text");
+            String text = msg.optString("text", "").trim();
+
+            ApiLogger.log(this, "RUBIKA_MSG", chatName + " | " + senderName + " | " + (text.isEmpty() ? "(" + type + ")" : text));
+
+            // Save text message
+            if ("Text".equals(type) && !text.isEmpty()) {
+                saveText(chatName, text);
             }
-            StringBuilder sb = new StringBuilder();
-            for (String g : guids) { if (sb.length() > 0) sb.append(","); sb.append(g); }
-            String csv = sb.toString();
-            if (!csv.isEmpty()) prefs.edit().putString("rubika_groups", csv).apply();
-            ApiLogger.log(this, "RUBIKA_CHATS", "total=" + guids.size() + " new=" + added);
+
+            // Claude reply for non-self text messages
+            if (!isSelf && !text.isEmpty()) {
+                final String fa = auth, ft = text, fn = chatName, fg = guid;
+                final PrivateKey fp = pk;
+                final long fi = msgId;
+                ClaudeApiClient.getRubikaReply(this, guid, senderName, text,
+                    new ClaudeApiClient.Callback() {
+                        @Override public void onReply(String reply, double cost) {
+                            try {
+                                RubikaClient.sendMessage(RubikaService.this, fa, fp, fg, reply, fi);
+                                ApiLogger.log(RubikaService.this, "RUBIKA_SENT", fn + " -> " + reply);
+                            } catch (Exception e) {
+                                ApiLogger.log(RubikaService.this, "RUBIKA_SEND_ERR", e.getMessage());
+                            }
+                        }
+                        @Override public void onError(String e) {
+                            ApiLogger.log(RubikaService.this, "RUBIKA_CLAUDE_ERR", e);
+                        }
+                    });
+            }
         } catch (Exception e) {
-            ApiLogger.log(this, "RUBIKA_CHATS_ERR", e.getMessage());
+            ApiLogger.log(this, "RUBIKA_MSG_ERR", e.getMessage());
         }
     }
 
-    private void pollChat(String auth, PrivateKey pk, String guid, SharedPreferences prefs) {
-        String lastKey = "rubika_last_" + guid;
-        long lastMsgId = prefs.getLong(lastKey, 0);
-        boolean seeding = (lastMsgId == 0);
-
+    private void fetchUnseen(String auth, PrivateKey pk, String guid, String chatName,
+                              long afterMsgId, String myGuid, SharedPreferences p) {
         try {
-            JSONObject resp = RubikaClient.getMessages(this, auth, pk, guid, lastMsgId);
-
-            String apiStatus = resp.optString("status", "");
-            if (!"OK".equals(apiStatus)) {
-                ApiLogger.log(this, "RUBIKA_MSG_ERR", guid.substring(0, 8) + " " + apiStatus + "/" + resp.optString("status_det", ""));
-                return;
-            }
+            JSONObject resp = RubikaClient.getMessages(this, auth, pk, guid, afterMsgId);
+            if (!"OK".equals(resp.optString("status", ""))) return;
 
             JSONArray messages = null;
-            if (resp.has("data")) {
-                JSONObject d = resp.optJSONObject("data");
-                if (d != null) messages = d.optJSONArray("messages");
-            }
+            JSONObject d = resp.optJSONObject("data");
+            if (d != null) messages = d.optJSONArray("messages");
             if (messages == null || messages.length() == 0) return;
 
-            String chatName = prefs.getString("rubika_group_name_" + guid, guid.substring(0, 8));
-            String myGuid = prefs.getString("rubika_my_guid", "");
-            long newLastId = lastMsgId;
+            ApiLogger.log(this, "RUBIKA_FETCH", chatName + " msgs=" + messages.length());
 
             for (int i = 0; i < messages.length(); i++) {
                 JSONObject msg = messages.getJSONObject(i);
                 long msgId = msg.optLong("message_id", 0);
-                if (msgId > newLastId) newLastId = msgId;
+                long lastSeen = p.getLong("rubika_last_" + guid, 0);
+                if (msgId <= lastSeen) continue;
 
-                // On first-ever poll for this chat: just seed position, no reply
-                if (seeding) continue;
-                if (msgId <= lastMsgId) continue;
-
-                String senderGuid = msg.optString("author_object_guid", msg.optString("from_object_guid", ""));
-                boolean isSelf = !myGuid.isEmpty() && myGuid.equals(senderGuid);
-                String text = msg.optString("text", "").trim();
-                String msgType = msg.optString("type", "Text");
-
-                ApiLogger.log(this, "RUBIKA_MSG", chatName + " | " + senderGuid.substring(0, Math.min(6, senderGuid.length())) + " | " + (text.isEmpty() ? "(" + msgType + ")" : text));
-
-                // Save
-                final String fa = auth; final PrivateKey fp = pk; final JSONObject fm = msg;
-                final String fc = chatName; final String fg = guid; final long fi = msgId;
-                new Thread(new Runnable() { @Override public void run() { saveMessage(fa, fp, fm, fc, fg, fi); } }).start();
-
-                // Claude reply for non-self text messages
-                if (!isSelf && !text.isEmpty()) {
-                    final String ft = text; final String fs = senderGuid;
-                    ClaudeApiClient.getRubikaReply(this, guid, senderGuid, text,
-                        new ClaudeApiClient.Callback() {
-                            @Override public void onReply(String reply, double cost) {
-                                try {
-                                    RubikaClient.sendMessage(RubikaService.this, fa, fp, fg, reply, fi);
-                                    ApiLogger.log(RubikaService.this, "RUBIKA_SENT", fc + " -> " + reply);
-                                } catch (Exception e) {
-                                    ApiLogger.log(RubikaService.this, "RUBIKA_SEND_ERR", e.getMessage());
-                                }
-                            }
-                            @Override public void onError(String err) {
-                                ApiLogger.log(RubikaService.this, "RUBIKA_CLAUDE_ERR", err);
-                            }
-                        });
-                }
+                handleMsg(auth, pk, guid, chatName, msg, myGuid, p);
             }
-
-            if (newLastId > lastMsgId) {
-                prefs.edit().putLong(lastKey, newLastId).apply();
-                if (seeding) ApiLogger.log(this, "RUBIKA_SEED", chatName + " pos=" + newLastId);
-            }
-
         } catch (Exception e) {
-            ApiLogger.log(this, "RUBIKA_POLL_ERR", guid.substring(0, 8) + ": " + e.getMessage());
+            ApiLogger.log(this, "RUBIKA_FETCH_ERR", e.getMessage());
         }
     }
 
-    private void saveMessage(String auth, PrivateKey pk, JSONObject msg, String chatName, String guid, long msgId) {
-        String type = msg.optString("type", "Text");
+    private void saveText(String chatName, String text) {
         try {
-            String safeName = chatName.replaceAll("[^\\w\\u0600-\\u06FF]", "_");
-            java.io.File appExternal = getExternalFilesDir("Rubika");
-            if (appExternal == null) appExternal = new java.io.File(getFilesDir(), "Rubika");
-            appExternal.mkdirs();
-            java.io.File base = appExternal;
-            java.io.File sdcard = new java.io.File("/sdcard/Ai/Rubika");
-            if (!sdcard.exists()) sdcard.mkdirs();
-            if (sdcard.canWrite()) base = sdcard;
-            java.io.File dir = new java.io.File(base, safeName);
-            dir.mkdirs();
-
-            if ("Text".equals(type)) {
-                String text = msg.optString("text", "").trim();
-                if (!text.isEmpty()) {
-                    java.io.File f = new java.io.File(dir, "messages.txt");
-                    java.io.FileWriter fw = new java.io.FileWriter(f, true);
-                    fw.write("[" + new java.util.Date() + "] " + text + "\n");
-                    fw.close();
-                    ApiLogger.log(this, "RUBIKA_SAVED", chatName + " -> " + f.getAbsolutePath());
-                }
+            String safe = chatName.replaceAll("[^\\w\\u0600-\\u06FF]", "_");
+            java.io.File base;
+            java.io.File sd = new java.io.File("/sdcard/Ai/Rubika");
+            if (!sd.exists()) sd.mkdirs();
+            if (sd.canWrite()) {
+                base = sd;
             } else {
-                JSONObject fi = msg.optJSONObject("file_inline");
-                if (fi != null) {
-                    String dcId = fi.optString("dc_id", ""), fileId = fi.optString("file_id", ""), hash = fi.optString("access_hash_rec", "");
-                    long size = fi.optLong("file_size", fi.optLong("size", 0));
-                    String fileName = fi.optString("file_name", "");
-                    if (fileName.isEmpty()) { String mime = fi.optString("mime", ""); String ext = mime.contains("/") ? mime.split("/")[1] : type.toLowerCase(); fileName = type.toLowerCase() + "_" + msgId + "." + ext; }
-                    if (!dcId.isEmpty() && !fileId.isEmpty() && !hash.isEmpty()) {
-                        byte[] data = RubikaClient.downloadFile(auth, fileId, dcId, hash, size);
-                        java.io.File out = new java.io.File(dir, fileName);
-                        java.io.FileOutputStream fos = new java.io.FileOutputStream(out);
-                        fos.write(data); fos.close();
-                        ApiLogger.log(this, "RUBIKA_SAVED", chatName + " " + type + " -> " + out.getAbsolutePath());
-                    }
-                }
+                base = getExternalFilesDir("Rubika");
+                if (base == null) base = new java.io.File(getFilesDir(), "Rubika");
+                base.mkdirs();
             }
+            java.io.File dir = new java.io.File(base, safe);
+            dir.mkdirs();
+            java.io.File f = new java.io.File(dir, "messages.txt");
+            java.io.FileWriter fw = new java.io.FileWriter(f, true);
+            fw.write("[" + new java.util.Date() + "] " + text + "\n");
+            fw.close();
+            ApiLogger.log(this, "RUBIKA_SAVED", f.getAbsolutePath());
         } catch (Exception e) {
             ApiLogger.log(this, "RUBIKA_SAVE_ERR", e.getMessage());
         }
     }
 
-    private PrivateKey loadPrivateKey(SharedPreferences prefs) {
-        String b64 = prefs.getString("rubika_private_key", "");
-        if (b64.isEmpty()) return null;
+    private PrivateKey loadPk(SharedPreferences p) {
         try {
-            byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
-            return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(bytes));
+            byte[] b = Base64.decode(p.getString("rubika_private_key", ""), Base64.DEFAULT);
+            return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(b));
         } catch (Exception e) {
             ApiLogger.log(this, "RUBIKA_KEY_ERR", e.getMessage());
             return null;
