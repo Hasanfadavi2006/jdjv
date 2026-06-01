@@ -174,16 +174,37 @@ public class RubikaService extends Service {
             prefs.edit().putString("rubika_group_name_" + guid, chatName).apply();
         }
 
+        final String shortGuid = guid.substring(0, Math.min(8, guid.length()));
+        ApiLogger.log(this, "RUBIKA_POLL_CHAT", shortGuid + " lastId=" + lastMsgId);
         try {
             JSONObject resp = RubikaClient.getMessages(this, auth, pk, guid, lastMsgId);
+
+            String apiStatus = resp.optString("status", "");
+            if (!"OK".equals(apiStatus)) {
+                ApiLogger.log(this, "RUBIKA_GETMSG_ERR",
+                    shortGuid + " status=" + apiStatus + " det=" + resp.optString("status_det", ""));
+                return;
+            }
 
             JSONArray messages = null;
             if (resp.has("data")) {
                 JSONObject d = resp.optJSONObject("data");
-                if (d != null) messages = d.optJSONArray("messages");
+                if (d != null) {
+                    messages = d.optJSONArray("messages");
+                    if (messages == null) {
+                        StringBuilder keys = new StringBuilder();
+                        java.util.Iterator<String> kit = d.keys();
+                        while (kit.hasNext()) { if (keys.length() > 0) keys.append(","); keys.append(kit.next()); }
+                        ApiLogger.log(this, "RUBIKA_NO_MSGS", shortGuid + " data keys=" + keys);
+                    }
+                }
             }
             if (messages == null) messages = resp.optJSONArray("messages");
-            if (messages == null || messages.length() == 0) return;
+            if (messages == null || messages.length() == 0) {
+                ApiLogger.log(this, "RUBIKA_EMPTY", shortGuid + " msgs=0 lastId=" + lastMsgId);
+                return;
+            }
+            ApiLogger.log(this, "RUBIKA_GOT", shortGuid + " msgs=" + messages.length());
 
             String myGuid = prefs.getString("rubika_my_guid", "");
             long newLastId = lastMsgId;

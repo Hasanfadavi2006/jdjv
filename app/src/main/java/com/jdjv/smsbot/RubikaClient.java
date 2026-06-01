@@ -410,9 +410,14 @@ public class RubikaClient {
                                          String guid, long minId) throws Exception {
         JSONObject input = new JSONObject();
         input.put("object_guid", guid);
-        input.put("min_id", minId);
-        input.put("limit", 20);
-        input.put("sort", "FromMin");
+        input.put("limit", 50);
+        if (minId > 0) {
+            input.put("min_id", minId);
+            input.put("sort", "FromMin");
+        } else {
+            // First ever poll for this chat: get most recent messages to seed position
+            input.put("sort", "FromMax");
+        }
         return callApi(ctx, auth, false, "getMessages", input, pk);
     }
 
