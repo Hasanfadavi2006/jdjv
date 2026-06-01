@@ -23,8 +23,9 @@ public class RubikaService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (!running) {
+        if (!running || pollThread == null || !pollThread.isAlive()) {
             running = true;
+            pollCount = 0;
             pollThread = new Thread(new Runnable() {
                 @Override public void run() { pollLoop(); }
             });
