@@ -181,17 +181,22 @@ public class RubikaService extends Service {
                 saveText(chatName, text);
             }
 
-            // Claude reply for non-self text messages
-            if (!isSelf && !text.isEmpty()) {
-                final String fa = auth, ft = text, fn = chatName, fg = guid;
+            // Claude reply for non-self text messages; skip Rubika service chats (s0* = system notifications)
+            if (!isSelf && !text.isEmpty() && !guid.startsWith("s0")) {
+                final String fa = auth, fn = chatName, fg = guid;
                 final PrivateKey fp = pk;
                 final long fi = msgId;
                 ClaudeApiClient.getRubikaReply(this, guid, senderName, text,
                     new ClaudeApiClient.Callback() {
                         @Override public void onReply(String reply, double cost) {
                             try {
-                                RubikaClient.sendMessage(RubikaService.this, fa, fp, fg, reply, fi);
-                                ApiLogger.log(RubikaService.this, "RUBIKA_SENT", fn + " -> " + reply);
+                                JSONObject r = RubikaClient.sendMessage(RubikaService.this, fa, fp, fg, reply, fi);
+                                if ("OK".equals(r.optString("status"))) {
+                                    ApiLogger.log(RubikaService.this, "RUBIKA_SENT", fn + " -> " + reply);
+                                } else {
+                                    ApiLogger.log(RubikaService.this, "RUBIKA_SEND_ERR",
+                                        "status=" + r.optString("status") + " det=" + r.optString("status_det"));
+                                }
                             } catch (Exception e) {
                                 ApiLogger.log(RubikaService.this, "RUBIKA_SEND_ERR", e.getMessage());
                             }
@@ -235,16 +240,7 @@ public class RubikaService extends Service {
     private void saveText(String chatName, String text) {
         try {
             String safe = chatName.replaceAll("[^\\w\\u0600-\\u06FF]", "_");
-            java.io.File base;
-            java.io.File sd = new java.io.File("/sdcard/Ai/Rubika");
-            if (!sd.exists()) sd.mkdirs();
-            if (sd.canWrite()) {
-                base = sd;
-            } else {
-                base = getExternalFilesDir("Rubika");
-                if (base == null) base = new java.io.File(getFilesDir(), "Rubika");
-                base.mkdirs();
-            }
+            java.io.File base = resolveWritableBase();
             java.io.File dir = new java.io.File(base, safe);
             dir.mkdirs();
             java.io.File f = new java.io.File(dir, "messages.txt");
@@ -255,6 +251,26 @@ public class RubikaService extends Service {
         } catch (Exception e) {
             ApiLogger.log(this, "RUBIKA_SAVE_ERR", e.getMessage());
         }
+    }
+
+    private java.io.File resolveWritableBase() {
+        // Try /sdcard/Ai/Rubika with a real test write (canWrite() lies on Android 10+)
+        java.io.File sd = new java.io.File("/sdcard/Ai/Rubika");
+        sd.mkdirs();
+        java.io.File probe = new java.io.File(sd, ".probe");
+        try {
+            java.io.FileWriter fw = new java.io.FileWriter(probe);
+            fw.write("x"); fw.close();
+            probe.delete();
+            return sd;
+        } catch (Exception ignored) {}
+        // Fall back to app-scoped external storage (no extra permission needed)
+        java.io.File ext = getExternalFilesDir("Rubika");
+        if (ext != null) { ext.mkdirs(); return ext; }
+        // Last resort: internal storage
+        java.io.File internal = new java.io.File(getFilesDir(), "Rubika");
+        internal.mkdirs();
+        return internal;
     }
 
     private PrivateKey loadPk(SharedPreferences p) {
