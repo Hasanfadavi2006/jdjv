@@ -120,6 +120,8 @@ public class RubikaService extends Service {
             }
 
             String newState = data.optString("state", "");
+            // OldState responses use "timestamp" key instead of "state"
+            if (newState.isEmpty()) newState = data.optString("timestamp", "");
             String dataStatus = data.optString("status", "");
             ApiLogger.log(this, "RUBIKA_UPD", "dataStatus=" + dataStatus + " newState=" + newState.substring(0, Math.min(8, newState.length())));
 
@@ -127,7 +129,7 @@ public class RubikaService extends Service {
                 prefs.edit().putString("rubika_state", newState).apply();
             }
 
-            if ("NoUpdates".equals(dataStatus)) return;
+            if ("OldState".equals(dataStatus) || "NoUpdates".equals(dataStatus)) return;
 
             JSONArray chatUpdates = data.optJSONArray("chat_updates");
             if (chatUpdates == null || chatUpdates.length() == 0) {
