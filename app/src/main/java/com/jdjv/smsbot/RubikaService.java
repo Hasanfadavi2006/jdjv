@@ -1,9 +1,12 @@
 package com.jdjv.smsbot;
 
+import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.IBinder;
 import android.util.Base64;
 import android.util.Log;
@@ -23,6 +26,7 @@ public class RubikaService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        startRubikaForeground();
         if (!running || pollThread == null || !pollThread.isAlive()) {
             running = true;
             pollCount = 0;
@@ -35,6 +39,35 @@ public class RubikaService extends Service {
             ApiLogger.log(this, "RUBIKA", "سرویس شروع به کار کرد");
         }
         return START_STICKY;
+    }
+
+    private void startRubikaForeground() {
+        final String CHANNEL_ID = "rubika_svc";
+        if (Build.VERSION.SDK_INT >= 26) {
+            try {
+                Class<?> ncClass = Class.forName("android.app.NotificationChannel");
+                // IMPORTANCE_LOW = 2
+                Object nc = ncClass
+                    .getConstructor(String.class, CharSequence.class, int.class)
+                    .newInstance(CHANNEL_ID, "Rubika Bot", 2);
+                NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                nm.getClass().getMethod("createNotificationChannel", ncClass).invoke(nm, nc);
+
+                Notification.Builder b = (Notification.Builder) Notification.Builder.class
+                    .getConstructor(Context.class, String.class)
+                    .newInstance(this, CHANNEL_ID);
+                b.setContentTitle("SmsBat").setContentText("روبیکا فعال")
+                 .setSmallIcon(android.R.drawable.ic_menu_send);
+                startForeground(7001, b.build());
+            } catch (Exception e) {
+                Log.e(TAG, "foreground err: " + e);
+            }
+        } else {
+            Notification notif = new Notification.Builder(this)
+                .setContentTitle("SmsBat").setContentText("روبیکا فعال")
+                .setSmallIcon(android.R.drawable.ic_menu_send).build();
+            startForeground(7001, notif);
+        }
     }
 
     @Override

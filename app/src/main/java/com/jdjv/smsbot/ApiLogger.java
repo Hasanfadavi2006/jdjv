@@ -9,7 +9,7 @@ import java.util.Locale;
 public class ApiLogger {
 
     private static final String FILE = "api_log.txt";
-    private static final int MAX_BYTES = 30000;
+    private static final int MAX_BYTES = 300000;
 
     public static synchronized void log(Context ctx, String tag, String msg) {
         try {
