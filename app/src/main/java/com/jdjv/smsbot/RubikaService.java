@@ -19,7 +19,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 public class RubikaService extends Service {
 
     private static final String TAG = "RubikaService";
-    private static final long POLL_INTERVAL = 30_000L;
+    private static final long POLL_INTERVAL = 5_000L;
     private volatile boolean running = false;
     private Thread pollThread;
     private int pollCount = 0;
@@ -35,8 +35,7 @@ public class RubikaService extends Service {
             });
             pollThread.setDaemon(true);
             pollThread.start();
-            Log.d(TAG, "سرویس روبیکا شروع شد");
-            ApiLogger.log(this, "RUBIKA", "سرویس شروع به کار کرد");
+            ApiLogger.log(this, "RUBIKA", "سرویس شروع شد — getChatsUpdates mode");
         }
         return START_STICKY;
     }
@@ -46,13 +45,11 @@ public class RubikaService extends Service {
         if (Build.VERSION.SDK_INT >= 26) {
             try {
                 Class<?> ncClass = Class.forName("android.app.NotificationChannel");
-                // IMPORTANCE_LOW = 2
                 Object nc = ncClass
                     .getConstructor(String.class, CharSequence.class, int.class)
                     .newInstance(CHANNEL_ID, "Rubika Bot", 2);
                 NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
                 nm.getClass().getMethod("createNotificationChannel", ncClass).invoke(nm, nc);
-
                 Notification.Builder b = (Notification.Builder) Notification.Builder.class
                     .getConstructor(Context.class, String.class)
                     .newInstance(this, CHANNEL_ID);
@@ -95,166 +92,110 @@ public class RubikaService extends Service {
         SharedPreferences prefs = getSharedPreferences("smsbot", Context.MODE_PRIVATE);
         String auth = prefs.getString("rubika_auth", "");
 
-        ApiLogger.log(this, "RUBIKA_TICK", "poll#" + pollCount + " auth=" + (auth.isEmpty() ? "EMPTY" : "OK"));
-
-        if (auth.isEmpty()) return;
+        if (auth.isEmpty()) {
+            ApiLogger.log(this, "RUBIKA_TICK", "poll#" + pollCount + " auth=EMPTY");
+            return;
+        }
         if (!prefs.getBoolean("enabled", true)) return;
 
         PrivateKey pk = loadPrivateKey(prefs);
+        String state = prefs.getString("rubika_state", "0");
+        boolean isFirstState = "0".equals(state);
 
-        // Refresh chat list on first poll and every 5 polls after that
-        String chatsCsv = prefs.getString("rubika_groups", "");
-        if (chatsCsv.isEmpty() || pollCount % 5 == 0) {
-            chatsCsv = refreshChats(auth, pk, prefs, chatsCsv);
-        }
+        ApiLogger.log(this, "RUBIKA_TICK", "poll#" + pollCount + " state=" + state.substring(0, Math.min(6, state.length())));
         pollCount++;
 
-        if (chatsCsv.isEmpty()) {
-            ApiLogger.log(this, "RUBIKA_POLL", "groups=0 — در انتظار کشف گروه‌ها");
-            return;
-        }
-
-        ApiLogger.log(this, "RUBIKA_POLL",
-            "groups=" + chatsCsv.split(",").length + " | " + chatsCsv);
-
-        for (String guid : chatsCsv.split(",")) {
-            if (guid.trim().isEmpty()) continue;
-            pollChat(auth, pk, guid.trim(), prefs);
-        }
-    }
-
-    private String refreshChats(String auth, PrivateKey pk, SharedPreferences prefs, String existingCsv) {
         try {
-            JSONObject resp = RubikaClient.getChats(this, auth, pk);
-            JSONArray list = null;
-            if (resp.has("data")) {
-                JSONObject d = resp.optJSONObject("data");
-                if (d != null) {
-                    list = d.optJSONArray("chats");
-                    if (list == null) list = d.optJSONArray("chat_updates");
-                }
-            }
-            if (list == null) list = resp.optJSONArray("chats");
-            if (list == null) return existingCsv;
+            JSONObject resp = RubikaClient.getChatsUpdates(this, auth, pk, state);
 
-            java.util.LinkedHashSet<String> guids = new java.util.LinkedHashSet<String>();
-            if (!existingCsv.isEmpty()) {
-                for (String g : existingCsv.split(",")) {
-                    String gt = g.trim();
-                    if (!gt.isEmpty()) guids.add(gt);
-                }
-            }
-            int added = 0;
-            for (int i = 0; i < list.length(); i++) {
-                String guid = list.getJSONObject(i).optString("object_guid", "");
-                if (!guid.isEmpty() && guids.add(guid)) added++;
-            }
-            StringBuilder sb = new StringBuilder();
-            for (String g : guids) { if (sb.length() > 0) sb.append(","); sb.append(g); }
-            String csv = sb.toString();
-            if (!csv.isEmpty()) prefs.edit().putString("rubika_groups", csv).apply();
-            ApiLogger.log(this, "RUBIKA_DISCOVER", "total=" + guids.size() + " new=" + added);
-            return csv;
-        } catch (Exception e) {
-            ApiLogger.log(this, "RUBIKA_DISCOVER_ERR", e.getMessage());
-            return existingCsv;
-        }
-    }
-
-    private void pollChat(String auth, PrivateKey pk, String guid, SharedPreferences prefs) {
-        String lastKey = "rubika_last_" + guid;
-        long lastMsgId = prefs.getLong(lastKey, 0);
-        boolean firstPoll = (lastMsgId == 0);
-
-        // Resolve and cache chat name
-        String chatName = prefs.getString("rubika_group_name_" + guid, "");
-        if (chatName.isEmpty()) {
-            String fetched = RubikaClient.getObjectTitle(this, auth, pk, guid);
-            chatName = (fetched != null && !fetched.isEmpty()) ? fetched : guid;
-            prefs.edit().putString("rubika_group_name_" + guid, chatName).apply();
-        }
-
-        final String shortGuid = guid.substring(0, Math.min(8, guid.length()));
-        ApiLogger.log(this, "RUBIKA_POLL_CHAT", shortGuid + " lastId=" + lastMsgId);
-        try {
-            JSONObject resp = RubikaClient.getMessages(this, auth, pk, guid, lastMsgId);
-
-            String apiStatus = resp.optString("status", "");
-            if (!"OK".equals(apiStatus)) {
-                ApiLogger.log(this, "RUBIKA_GETMSG_ERR",
-                    shortGuid + " status=" + apiStatus + " det=" + resp.optString("status_det", ""));
+            String status = resp.optString("status", "");
+            if (!"OK".equals(status)) {
+                ApiLogger.log(this, "RUBIKA_UPD_ERR", "status=" + status + " det=" + resp.optString("status_det", ""));
                 return;
             }
 
-            JSONArray messages = null;
-            if (resp.has("data")) {
-                JSONObject d = resp.optJSONObject("data");
-                if (d != null) {
-                    messages = d.optJSONArray("messages");
-                    if (messages == null) {
-                        StringBuilder keys = new StringBuilder();
-                        java.util.Iterator<String> kit = d.keys();
-                        while (kit.hasNext()) { if (keys.length() > 0) keys.append(","); keys.append(kit.next()); }
-                        ApiLogger.log(this, "RUBIKA_NO_MSGS", shortGuid + " data keys=" + keys);
-                    }
-                }
-            }
-            if (messages == null) messages = resp.optJSONArray("messages");
-            if (messages == null || messages.length() == 0) {
-                ApiLogger.log(this, "RUBIKA_EMPTY", shortGuid + " msgs=0 lastId=" + lastMsgId);
+            JSONObject data = resp.optJSONObject("data");
+            if (data == null) {
+                ApiLogger.log(this, "RUBIKA_UPD_ERR", "no data in response");
                 return;
             }
-            ApiLogger.log(this, "RUBIKA_GOT", shortGuid + " msgs=" + messages.length());
 
+            String newState = data.optString("state", "");
+            String dataStatus = data.optString("status", "");
+            ApiLogger.log(this, "RUBIKA_UPD", "dataStatus=" + dataStatus + " newState=" + newState.substring(0, Math.min(8, newState.length())));
+
+            if (!newState.isEmpty() && !"0".equals(newState)) {
+                prefs.edit().putString("rubika_state", newState).apply();
+            }
+
+            if ("NoUpdates".equals(dataStatus)) return;
+
+            JSONArray chatUpdates = data.optJSONArray("chat_updates");
+            if (chatUpdates == null || chatUpdates.length() == 0) {
+                // Log all data keys so we can debug unexpected formats
+                StringBuilder keys = new StringBuilder();
+                java.util.Iterator<String> kit = data.keys();
+                while (kit.hasNext()) { if (keys.length() > 0) keys.append(","); keys.append(kit.next()); }
+                ApiLogger.log(this, "RUBIKA_UPD_KEYS", "data keys=" + keys);
+                return;
+            }
+
+            ApiLogger.log(this, "RUBIKA_GOT", "chat_updates count=" + chatUpdates.length());
             String myGuid = prefs.getString("rubika_my_guid", "");
-            long newLastId = lastMsgId;
-            final String fChatName = chatName;
 
-            for (int i = 0; i < messages.length(); i++) {
-                JSONObject msg = messages.getJSONObject(i);
+            for (int i = 0; i < chatUpdates.length(); i++) {
+                JSONObject update = chatUpdates.getJSONObject(i);
+                String chatGuid = update.optString("object_guid", "");
+                if (chatGuid.isEmpty()) continue;
+
+                JSONObject msgUpdate = update.optJSONObject("message_update");
+                if (msgUpdate == null) continue;
+
+                String msgUpdateType = msgUpdate.optString("type", "");
+                if (!"NewMessage".equals(msgUpdateType)) continue;
+
+                JSONObject msg = msgUpdate.optJSONObject("message");
+                if (msg == null) continue;
+
+                String chatName = prefs.getString("rubika_group_name_" + chatGuid, "");
+                if (chatName.isEmpty()) {
+                    String fetched = RubikaClient.getObjectTitle(this, auth, pk, chatGuid);
+                    chatName = (fetched != null && !fetched.isEmpty()) ? fetched : chatGuid.substring(0, Math.min(8, chatGuid.length()));
+                    prefs.edit().putString("rubika_group_name_" + chatGuid, chatName).apply();
+                }
+
                 long msgId = msg.optLong("message_id", 0);
-                if (msgId <= lastMsgId) continue;
-                if (msgId > newLastId) newLastId = msgId;
-
-                String senderGuid = msg.optString("author_object_guid",
-                    msg.optString("from_object_guid", ""));
+                String senderGuid = msg.optString("author_object_guid", msg.optString("from_object_guid", ""));
                 boolean isSelf = !myGuid.isEmpty() && myGuid.equals(senderGuid);
-
                 String senderName = msg.optString("author_title", senderGuid);
                 String msgType = msg.optString("type", "Text");
                 String text = msg.optString("text", "").trim();
-                final long fMsgId = msgId;
 
-                ApiLogger.log(this, "RUBIKA_MSG", fChatName + " | " + senderName
+                ApiLogger.log(this, "RUBIKA_MSG", chatName + " | " + senderName
                     + " [" + msgType + "]: " + (text.isEmpty() ? "(media)" : text));
-
-                // ── Save ALL messages to /sdcard/Ai/Rubika/ (even on first poll) ──
-                final String fAuth2 = auth;
-                final PrivateKey fPk2 = pk;
-                final String fGuid2 = guid;
-                final JSONObject fMsg = msg;
-                final String fChatName2 = fChatName;
-                new Thread(new Runnable() {
-                    @Override public void run() {
-                        saveMessage(fAuth2, fPk2, fMsg, fChatName2, fGuid2, fMsgId);
-                    }
-                }).start();
-
-                // Claude reply only for new (non-first-poll) messages from others
-                if (firstPoll || isSelf) continue;
 
                 final String fAuth = auth;
                 final PrivateKey fPk = pk;
-                final String fGuid = guid;
+                final JSONObject fMsg = msg;
+                final String fChatName = chatName;
+                final String fChatGuid = chatGuid;
+                final long fMsgId = msgId;
+                new Thread(new Runnable() {
+                    @Override public void run() {
+                        saveMessage(fAuth, fPk, fMsg, fChatName, fChatGuid, fMsgId);
+                    }
+                }).start();
+
+                if (isFirstState || isSelf || text.isEmpty()) continue;
+
                 final String fText = text;
                 final String fSender = senderName;
-
-                ClaudeApiClient.getRubikaReply(this, fGuid, fSender, fText,
+                ClaudeApiClient.getRubikaReply(this, fChatGuid, fSender, fText,
                     new ClaudeApiClient.Callback() {
                         @Override public void onReply(String reply, double costUsd) {
                             try {
                                 RubikaClient.sendMessage(RubikaService.this, fAuth, fPk,
-                                    fGuid, reply, fMsgId);
+                                    fChatGuid, reply, fMsgId);
                                 ApiLogger.log(RubikaService.this, "RUBIKA_SENT",
                                     fChatName + " -> " + reply);
                             } catch (Exception e) {
@@ -267,42 +208,28 @@ public class RubikaService extends Service {
                     });
             }
 
-            if (newLastId > lastMsgId) {
-                prefs.edit().putLong(lastKey, newLastId).apply();
-            }
-
         } catch (Exception e) {
-            ApiLogger.log(this, "RUBIKA_POLL_ERR", guid + ": " + e.getMessage());
+            ApiLogger.log(this, "RUBIKA_UPD_EX", e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
 
     private void saveMessage(String auth, PrivateKey pk, JSONObject msg,
                               String chatName, String guid, long msgId) {
         String type = msg.optString("type", "Text");
-        ApiLogger.log(this, "RUBIKA_SAVE_TRY", chatName + " type=" + type + " id=" + msgId);
         try {
             String safeName = chatName.replaceAll("[^\\w\\u0600-\\u06FF]", "_");
 
-            // Try /sdcard/Ai/Rubika/ first, fall back to app-private storage
-            java.io.File base = new java.io.File("/sdcard/Ai/Rubika");
-            // Primary: always-writable app-external dir (no permission needed)
             java.io.File appExternal = getExternalFilesDir("Rubika");
             if (appExternal == null) appExternal = new java.io.File(getFilesDir(), "Rubika");
             appExternal.mkdirs();
-            base = appExternal;
+            java.io.File base = appExternal;
 
-            // Bonus: also try /sdcard/Ai/Rubika/ if writable (needs MANAGE_EXTERNAL_STORAGE on API 30+)
             java.io.File sdcard = new java.io.File("/sdcard/Ai/Rubika");
             if (!sdcard.exists()) sdcard.mkdirs();
             if (sdcard.canWrite()) base = sdcard;
 
             java.io.File dir = new java.io.File(base, safeName);
             dir.mkdirs();
-            ApiLogger.log(this, "RUBIKA_SAVE_DIR",
-                dir.getAbsolutePath() + " | exists=" + dir.exists() + " canWrite=" + dir.canWrite());
-
-            boolean saved = false;
-            String savedDesc = "";
 
             if ("Text".equals(type)) {
                 String text = msg.optString("text", "").trim();
@@ -311,17 +238,11 @@ public class RubikaService extends Service {
                     java.io.FileWriter fw = new java.io.FileWriter(f, true);
                     fw.write("[" + new java.util.Date() + "] " + text + "\n");
                     fw.close();
-                    saved = true;
-                    savedDesc = "متن";
-                    ApiLogger.log(this, "RUBIKA_SAVE_OK", f.getAbsolutePath());
-                } else {
-                    ApiLogger.log(this, "RUBIKA_SAVE_SKIP", "text empty");
+                    ApiLogger.log(this, "RUBIKA_SAVED", chatName + " text -> " + f.getAbsolutePath());
                 }
             } else {
                 JSONObject fi = msg.optJSONObject("file_inline");
-                if (fi == null) {
-                    ApiLogger.log(this, "RUBIKA_SAVE_SKIP", "no file_inline for type=" + type);
-                } else {
+                if (fi != null) {
                     String dcId = fi.optString("dc_id", "");
                     String fileId = fi.optString("file_id", "");
                     String hash = fi.optString("access_hash_rec", "");
@@ -332,31 +253,18 @@ public class RubikaService extends Service {
                         String ext = mime.contains("/") ? mime.split("/")[1] : type.toLowerCase();
                         fileName = type.toLowerCase() + "_" + msgId + "." + ext;
                     }
-                    ApiLogger.log(this, "RUBIKA_SAVE_FILE",
-                        "dc=" + dcId + " id=" + fileId + " size=" + size + " name=" + fileName);
                     if (!dcId.isEmpty() && !fileId.isEmpty() && !hash.isEmpty()) {
                         byte[] data = RubikaClient.downloadFile(auth, fileId, dcId, hash, size);
                         java.io.File outFile = new java.io.File(dir, fileName);
                         java.io.FileOutputStream fos = new java.io.FileOutputStream(outFile);
                         fos.write(data);
                         fos.close();
-                        saved = true;
-                        savedDesc = type + " (" + (data.length / 1024) + "KB) → " + fileName;
-                        ApiLogger.log(this, "RUBIKA_SAVE_OK", outFile.getAbsolutePath());
-                    } else {
-                        ApiLogger.log(this, "RUBIKA_SAVE_SKIP",
-                            "missing fields dc=" + dcId + " id=" + fileId);
+                        ApiLogger.log(this, "RUBIKA_SAVED", chatName + " " + type + " -> " + outFile.getAbsolutePath());
                     }
                 }
             }
-
-            if (saved) {
-                ApiLogger.log(this, "RUBIKA_SAVED", chatName + " | " + savedDesc);
-            } else {
-                ApiLogger.log(this, "RUBIKA_SAVE_FAIL", "nothing saved for type=" + type);
-            }
         } catch (Exception e) {
-            ApiLogger.log(this, "RUBIKA_SAVE_ERR", e.getMessage() + " | " + e.getClass().getSimpleName());
+            ApiLogger.log(this, "RUBIKA_SAVE_ERR", e.getMessage());
         }
     }
 

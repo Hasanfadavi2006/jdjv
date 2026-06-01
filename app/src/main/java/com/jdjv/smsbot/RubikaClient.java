@@ -406,6 +406,12 @@ public class RubikaClient {
         return merged;
     }
 
+    public static JSONObject getChatsUpdates(Context ctx, String auth, PrivateKey pk, String state) throws Exception {
+        JSONObject input = new JSONObject();
+        input.put("state", (state == null || state.isEmpty()) ? "0" : state);
+        return callApi(ctx, auth, false, "getChatsUpdates", input, pk);
+    }
+
     public static JSONObject getMessages(Context ctx, String auth, PrivateKey pk,
                                          String guid, long minId) throws Exception {
         JSONObject input = new JSONObject();
