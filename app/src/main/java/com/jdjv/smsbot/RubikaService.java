@@ -89,7 +89,13 @@ public class RubikaService extends Service {
         JSONObject resp = RubikaClient.getChatsUpdates(this, auth, pk, String.valueOf(state));
 
         if (!"OK".equals(resp.optString("status", ""))) {
-            ApiLogger.log(this, "RUBIKA_ERR", "status=" + resp.optString("status") + " " + resp.optString("status_det"));
+            String det = resp.optString("status_det", "");
+            ApiLogger.log(this, "RUBIKA_ERR", "status=" + resp.optString("status") + " " + det);
+            if ("NOT_REGISTERED".equals(det)) {
+                // Auth expired — clear token so UI shows login is needed, stop polling
+                p.edit().remove("rubika_auth").remove("rubika_state_ts").apply();
+                running = false;
+            }
             return;
         }
 
